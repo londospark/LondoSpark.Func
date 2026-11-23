@@ -29,6 +29,10 @@ The dependency-light core:
 
 The core should not depend on FSharp.Core or Roslyn.
 
+`Validation<TSuccess, TFailure>` is an applicative for independent checks. It
+accumulates failures in an ordered, non-empty list and intentionally does not
+expose `Bind`.
+
 ### `LondoSpark.Func.Generators`
 
 An optional Roslyn incremental source generator that emits repetitive, type-specific
@@ -40,6 +44,13 @@ must not use runtime reflection or add runtime dispatch.
 An optional interop package referencing FSharp.Core. It supplies explicit conversions
 between the core types and standard F# `option` and `Result` types. Users who do not
 use F# should not acquire this dependency.
+
+### ASP.NET Core and Blazor integrations
+
+Optional adapters may provide framework-specific helpers without adding ASP.NET Core
+or Blazor dependencies to `LondoSpark.Func`. Keep HTTP response policy out of the core
+types. Decide whether Blazor needs a separate package only when its dependencies or
+supported targets differ from the ASP.NET Core integration.
 
 Tests and samples should live in separate projects from the distributable library.
 The test project uses TUnit and TUnit.FsCheck on Microsoft Testing Platform.
@@ -87,15 +98,33 @@ Do not generate `Where` by default. Filtering a `Result` requires an error value
 failed predicate, and that policy cannot be inferred. Add `Where` only when a monad
 provides an explicit filtering policy.
 
+### Functor and applicative operations
+
+`Select` transforms an active value without unwrapping its surrounding case.
+`Apply` takes a wrapped function first and a wrapped value second so independent
+computations can be combined.
+
+- `Option.Apply` returns `None` when either input is absent.
+- `Result.Apply` is fail-fast; if both inputs fail, the function-side failure
+  takes precedence, matching left-to-right composition.
+- `ErrorResult.Apply` is failure-focused; success cases pass through.
+- `Validation.Apply` accumulates function-side then value-side errors in a
+  non-empty list.
+
+No general `Monoid<T>` interface is needed for ordered error-list accumulation.
+Add one only if consumers need configurable combination policies.
+
 ## 4. Monad primitives and source generation
 
-`Return` and `Bind` are the semantic primitives. LINQ operators should be adapters
-over those primitives:
+`Return` and `Bind` are the monadic primitives; `Apply` combines independent
+computations. LINQ operators should be adapters over the monadic primitives:
 
 - one-selector `SelectMany` delegates to `Bind`;
 - `Select` is `Bind` followed by `Return`;
 - result-selector `SelectMany` binds the first value, maps the inner value through
   the projector, and preserves the first value for that projection.
+- `Apply` uses the function-container-first convention and preserves each type's
+  documented failure semantics.
 
 The generator should target tagged-union monads with one explicitly selected
 type-parameter focus and one or more pass-through cases. Metadata must say which case
@@ -104,7 +133,7 @@ its monadic meaning.
 
 The first generator version should:
 
-- emit the three LINQ operators above;
+- emit `Select`, `Bind`, `Apply`, and the LINQ operators above;
 - preserve generic constraints and nullability annotations;
 - support `Option`, success-focused `Result`, and the error-focused `Result` view;
 - emit deterministic extension methods and useful diagnostics for unsupported
@@ -145,8 +174,12 @@ opt-in utility, not as the default path.
 
 ## 6. Law and behavior tests
 
-FsCheck properties run under TUnit and should verify the monad laws using case-aware equality helpers
-rather than assuming every generated union has a particular equality implementation.
+FsCheck properties run under TUnit and should verify functor, applicative, and
+monad laws using case-aware equality helpers rather than assuming every generated
+union has a particular equality implementation.
+
+For each functor, verify identity and composition. For each applicative, verify
+identity, homomorphism, interchange, and composition. For each monad, verify:
 
 For each supported focus:
 
@@ -194,8 +227,25 @@ current unary `SelectMany` operation is the bind operation under test; when an e
 - Preserve the optional error-focused wrapper.
 - Move tests into a dedicated test project.
 - Add case-aware monad-law tests and tests for distinct result-selector output types.
+- Expose functional `Bind` and `Apply` operations in addition to query syntax.
+- Verify functor, applicative, and monad laws for each applicable type.
+- Add `Validation` for independent checks that should accumulate ordered errors.
 
-### Phase 2: source generator
+### Phase 2: F# standard interop
+
+- Add the optional FSharp.Core adapter package.
+- Implement strict standard Option and Result conversions.
+- Test null handling and round trips from both C# and F# projects.
+
+### Phase 3: ASP.NET Core and Blazor integrations
+
+- Identify concrete hosting scenarios and supported framework targets.
+- Add optional adapters without introducing web-framework dependencies into the core.
+- Keep HTTP status and error-response policy explicit and caller-controlled.
+- Split Blazor-specific helpers into a separate package only if its dependencies or
+  target frameworks require that boundary.
+
+### Phase 4: source generator
 
 - Prototype the generator against `Option` and `Result`.
 - Define explicit metadata for focus and pass-through cases.
@@ -203,13 +253,7 @@ current unary `SelectMany` operation is the bind operation under test; when an e
   reference implementation.
 - Keep generated files inspectable and diagnostics actionable.
 
-### Phase 3: F# standard interop
-
-- Add the optional FSharp.Core adapter package.
-- Implement strict standard Option and Result conversions.
-- Test null handling and round trips from both C# and F# projects.
-
-### Phase 4: custom DU interop
+### Phase 5: custom DU interop
 
 - Add only when a real mixed-language use case requires it.
 - Specify mapping metadata and generated conversion diagnostics.
@@ -227,7 +271,7 @@ Before publishing:
 - document nullability, equality, and conversion behavior;
 - publish versioned packages with compatibility tests for each supported target.
 
-The initial release should be intentionally small: core `Option` and `Result`, query
-syntax generation, standard F# Option/Result adapters, and law tests. Broader
-LanguageExt-like abstractions should be driven by demonstrated use cases rather than
-included in the first package.
+Keep the core release intentionally small. Standard F# interop and framework
+integrations should remain optional packages. Add source generation only after the
+core contract is stable and its value exceeds the maintenance cost; broader
+LanguageExt-like abstractions should be driven by demonstrated use cases.

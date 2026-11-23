@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build benchmarks",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/benchmarks/LondoSpark.Func.Benchmarks/LondoSpark.Func.Benchmarks.csproj",
+        "--configuration",
+        "Release"
+      ],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}
