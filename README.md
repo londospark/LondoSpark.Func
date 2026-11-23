@@ -9,13 +9,15 @@ The project is early in development; its API and package layout may change.
 
 - `src/LondoSpark.Func` — core `Option<T>` and `Result<TSuccess, TFailure>` types,
   LINQ query operators, and conversions between `Option<T>` and `Result<T, Unit>`.
+- `src/LondoSpark.Func.FSharp` — typed conversions to and from F# `option` and
+  `Result`, including values whose payload types are nullable.
 - `tests/LondoSpark.Func.Tests` — TUnit tests and FsCheck monad-law properties.
+- `tests/LondoSpark.Func.FSharp.Compatibility` — an F# consumer smoke test for
+  the C# interop package.
 - `docs/package-spec.md` — design and delivery plan.
 
-The planned `LondoSpark.Func.FSharp` project will provide optional conversions to
-and from F#'s standard `option` and `Result` types. It is not implemented yet.
-When added, it will have its own project directory under `src/` and a matching
-test project under `tests/`.
+The F# adapter is optional; consumers of the core package do not acquire
+FSharp.Core unless they reference `LondoSpark.Func.FSharp`.
 
 ## Build and test
 
@@ -24,10 +26,30 @@ Requires the .NET 11 SDK.
 ```sh
 dotnet build LondoSpark.Func.slnx
 dotnet test --project tests/LondoSpark.Func.Tests/LondoSpark.Func.Tests.csproj
+dotnet run --project tests/LondoSpark.Func.FSharp.Compatibility/LondoSpark.Func.FSharp.Compatibility.fsproj
 ```
 
-The library has no runtime dependencies. The test project uses TUnit and
-TUnit.FsCheck on Microsoft Testing Platform.
+The core library has no runtime dependencies; the F# adapter depends on
+FSharp.Core. The test project uses TUnit and TUnit.FsCheck on Microsoft Testing
+Platform. The F# compatibility project verifies that both adapters preserve
+option/result cases and payloads.
+
+Nullable reference annotations guide C# callers. `Option<T>` and
+`Result<TSuccess, TFailure>` preserve nullable payloads in their explicit cases:
+`Some(null)` remains distinct from `None`, and a null success remains distinct
+from a null failure. In C#, use nullable type arguments such as `string?` when
+a payload may be nullable. With nullable checking enabled, F# has corresponding
+nullness types, such as `string | null`, and warns when a nullable value is used
+where a non-null value is expected.
+
+These annotations are compile-time guidance, not runtime validation. The core
+does not add defensive null checks: explicitly nullable values can be carried
+through `Option` and `Result`, but dereferencing or invoking a null payload
+without handling it can fail at runtime. Suppressing warnings or passing
+unannotated values across interop boundaries does not make them non-null.
+`ToOption()` is the boundary helper that treats nullable input as absence;
+directly constructing a `Some` or a `Success`/`Failure` preserves that case and
+payload.
 
 The local BenchmarkDotNet project is deliberately outside the solution and is
 not run by CI. BenchmarkDotNet's latest stable release does not recognize the
@@ -68,10 +90,14 @@ type:
 
 ```csharp
 static Result<int, string> ParseInteger(string text) =>
-    int.TryParse(text, out int value) ? value : "Expected an integer.";
+    int.TryParse(text, out int value)
+        ? Result.Return<int, string>(value)
+        : Result.Failure<int, string>("Expected an integer.");
 
 static Result<int, string> RequirePositive(int value) =>
-    value > 0 ? value : "Expected a positive number.";
+    value > 0
+        ? Result.Return<int, string>(value)
+        : Result.Failure<int, string>("Expected a positive number.");
 
 Result<int, string> result = ParseInteger("42")
     .Bind(RequirePositive)
@@ -110,7 +136,9 @@ the same short-circuiting behavior as fluent `Bind`:
 
 ```csharp
 static Result<int, string> Divide(int numerator, int denominator) =>
-    denominator == 0 ? "Division by zero." : numerator / denominator;
+    denominator == 0
+        ? Result.Failure<int, string>("Division by zero.")
+        : Result.Return<int, string>(numerator / denominator);
 
 var calculation =
     from numerator in ParseInteger("100")
@@ -138,14 +166,16 @@ app.MapGet("/products/{id:int}", (int id) => ToHttpResult(FindProduct(id)));
 app.Run();
 
 static Result<Product, ProductNotFound> FindProduct(int id) =>
-    id == 42 ? new Product(id, "Answer") : new ProductNotFound();
+    id == 42
+        ? Result.Return<Product, ProductNotFound>(new Product(id, "Answer"))
+        : Result.Failure<Product, ProductNotFound>(new ProductNotFound());
 
 static Results<Ok<Product>, NotFound> ToHttpResult(
     Result<Product, ProductNotFound> result) =>
     result switch
     {
-        Product product => TypedResults.Ok(product),
-        ProductNotFound => TypedResults.NotFound()
+        Success<Product> success => TypedResults.Ok(success.Value),
+        Failure<ProductNotFound> => TypedResults.NotFound()
     };
 
 public sealed record Product(int Id, string Name);
@@ -177,10 +207,10 @@ Components can keep loading, success, and expected failure explicit using
     private string ProductStatus => _productResult switch
     {
         None => "Loading product...",
-        Result<Product, ProductNotFound> result => result switch
+        Some<Result<Product, ProductNotFound>> some => some.Value switch
         {
-            Product product => $"Product: {product.Name}",
-            ProductNotFound => "Product not found."
+            Success<Product> success => $"Product: {success.Value.Name}",
+            Failure<ProductNotFound> => "Product not found."
         }
     };
 
@@ -203,10 +233,11 @@ The project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ```sh
 dotnet pack src/LondoSpark.Func/LondoSpark.Func.csproj --configuration Release
+dotnet pack src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj --configuration Release
 ```
 
-This creates the package under `src/LondoSpark.Func/bin/Release`. The GitHub
-Actions workflow builds and tests the solution, then uploads the package as a
+These create packages under each project's `bin/Release` directory. The GitHub
+Actions workflow builds and tests the solution, then uploads both packages as a
 workflow artifact; it does not publish to NuGet.org.
 
 ## Contributing

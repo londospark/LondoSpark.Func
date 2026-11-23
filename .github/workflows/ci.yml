@@ -27,14 +27,19 @@ jobs:
         run: dotnet build LondoSpark.Func.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test LondoSpark.Func.slnx --configuration Release --no-build --no-restore
+        run: dotnet test --project tests/LondoSpark.Func.Tests/LondoSpark.Func.Tests.csproj --configuration Release --no-build --no-restore
+
+      - name: Verify F# interop
+        run: dotnet run --project tests/LondoSpark.Func.FSharp.Compatibility/LondoSpark.Func.FSharp.Compatibility.fsproj --configuration Release --no-build --no-restore
 
       - name: Pack
-        run: dotnet pack src/LondoSpark.Func/LondoSpark.Func.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
+        run: |
+          dotnet pack src/LondoSpark.Func/LondoSpark.Func.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
+          dotnet pack src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
 
-      - name: Upload NuGet package
+      - name: Upload NuGet packages
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: nuget-package
+          name: nuget-packages
           path: ${{ runner.temp }}/packages/*.nupkg
           if-no-files-found: error

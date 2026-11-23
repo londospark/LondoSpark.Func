@@ -10,7 +10,7 @@ public sealed class MonadLawProperties
     public bool OptionLeftIdentity(int value, int offset, bool returnsNone)
     {
         Option<int> Bind(int input) =>
-            returnsNone ? new None() : Option.Return(unchecked(input + offset));
+            returnsNone ? Option.Empty<int>() : Option.Return(unchecked(input + offset));
 
         return Equivalent(
             Option.Return(value).SelectMany(Bind),
@@ -20,7 +20,7 @@ public sealed class MonadLawProperties
     [Test, FsCheckProperty]
     public bool OptionRightIdentity(bool hasValue, int value)
     {
-        Option<int> source = hasValue ? Option.Return(value) : new None();
+        Option<int> source = hasValue ? Option.Return(value) : Option.Empty<int>();
         var bound = source.SelectMany(item => Option.Return(item));
 
         return Equivalent(bound, source);
@@ -35,13 +35,13 @@ public sealed class MonadLawProperties
         int secondOffset,
         bool secondReturnsNone)
     {
-        Option<int> source = hasValue ? Option.Return(value) : new None();
+        Option<int> source = hasValue ? Option.Return(value) : Option.Empty<int>();
 
         Option<int> First(int input) =>
-            firstReturnsNone ? new None() : Option.Return(unchecked(input + firstOffset));
+            firstReturnsNone ? Option.Empty<int>() : Option.Return(unchecked(input + firstOffset));
 
         Option<int> Second(int input) =>
-            secondReturnsNone ? new None() : Option.Return(unchecked(input + secondOffset));
+            secondReturnsNone ? Option.Empty<int>() : Option.Return(unchecked(input + secondOffset));
 
         var left = source.SelectMany(First).SelectMany(Second);
         var right = source.SelectMany(input => First(input).SelectMany(Second));
@@ -104,8 +104,7 @@ public sealed class MonadLawProperties
     public bool ErrorResultRightIdentity(bool isFailure, int value)
     {
         var source = (isFailure ? Failure(value) : Success(value)).AsErrorResult();
-        var bound = source.BindError(error =>
-            new ErrorResult<int, string>(new Result<int, string>(error)));
+        var bound = source.BindError(error => ErrorResult.Return<int, string>(error));
 
         return Equivalent(bound, source);
     }
@@ -136,18 +135,19 @@ public sealed class MonadLawProperties
     private static bool Equivalent(Option<int> left, Option<int> right) =>
         left switch
         {
-            int leftValue => right switch
+            Some<int> leftSome => right switch
             {
-                int rightValue => leftValue == rightValue,
+                Some<int> rightSome => leftSome.Value == rightSome.Value,
                 None _ => false
             },
             None _ => right is None
         };
 
-    private static Result<int, string> Success(int value) => new(value);
+    private static Result<int, string> Success(int value) =>
+        Result.Return<int, string>(value);
 
     private static Result<int, string> Failure(int errorCode) =>
-        new(ErrorMessage(errorCode));
+        Result.Failure<int, string>(ErrorMessage(errorCode));
 
     private static string ErrorMessage(int errorCode) => $"error:{errorCode}";
 
@@ -162,22 +162,22 @@ public sealed class MonadLawProperties
         bool returnsSuccess) =>
         new(returnsSuccess
             ? Success(errorCode)
-            : new Result<int, string>($"{currentError}|{errorCode}"));
+            : Result.Failure<int, string>($"{currentError}|{errorCode}"));
 
     private static bool Equivalent(
         Result<int, string> left,
         Result<int, string> right) =>
         left switch
         {
-            int leftValue => right switch
+            Success<int> leftSuccess => right switch
             {
-                int rightValue => leftValue == rightValue,
-                string _ => false
+                Success<int> rightSuccess => leftSuccess.Value == rightSuccess.Value,
+                Failure<string> _ => false
             },
-            string leftError => right switch
+            Failure<string> leftFailure => right switch
             {
-                string rightError => leftError == rightError,
-                int _ => false
+                Failure<string> rightFailure => leftFailure.Value == rightFailure.Value,
+                Success<int> _ => false
             }
         };
 

@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/LondoSpark.Func/LondoSpark.Func.csproj" />
+    <Project Path="src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/LondoSpark.Func.Tests/LondoSpark.Func.Tests.csproj" />
+    <Project Path="tests/LondoSpark.Func.FSharp.Compatibility/LondoSpark.Func.FSharp.Compatibility.fsproj" />
   </Folder>
 </Solution>

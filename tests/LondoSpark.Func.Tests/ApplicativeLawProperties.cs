@@ -13,14 +13,14 @@ public sealed class ApplicativeLawProperties
     [Test, FsCheckProperty]
     public bool OptionFunctorIdentity(bool hasValue, int value)
     {
-        Option<int> source = hasValue ? Option.Return(value) : new None();
+        Option<int> source = hasValue ? Option.Return(value) : Option.Empty<int>();
         return OptionEquivalent(source.Select(item => item), source);
     }
 
     [Test, FsCheckProperty]
     public bool OptionFunctorComposition(bool hasValue, int value, int offset)
     {
-        Option<int> source = hasValue ? Option.Return(value) : new None();
+        Option<int> source = hasValue ? Option.Return(value) : Option.Empty<int>();
         var left = source.Select(item => unchecked(item + offset)).Select(item => item * 2);
         var right = source.Select(item => unchecked((item + offset) * 2));
         return OptionEquivalent(left, right);
@@ -29,7 +29,7 @@ public sealed class ApplicativeLawProperties
     [Test, FsCheckProperty]
     public bool OptionApplicativeIdentity(bool hasValue, int value)
     {
-        Option<int> source = hasValue ? Option.Return(value) : new None();
+        Option<int> source = hasValue ? Option.Return(value) : Option.Empty<int>();
         Option<Func<int, int>> identity = Option.Return<Func<int, int>>(item => item);
         return OptionEquivalent(identity.Apply(source), source);
     }
@@ -48,7 +48,7 @@ public sealed class ApplicativeLawProperties
     {
         Option<Func<int, int>> function = hasFunction
             ? Option.Return<Func<int, int>>(item => unchecked(item + offset))
-            : new None();
+            : Option.Empty<Func<int, int>>();
         Option<int> argument = Option.Return(value);
 
         var left = function.Apply(argument);
@@ -62,11 +62,11 @@ public sealed class ApplicativeLawProperties
     {
         Option<Func<int, int>> u = uHasValue
             ? Option.Return<Func<int, int>>(item => unchecked(item + 1))
-            : new None();
+            : Option.Empty<Func<int, int>>();
         Option<Func<int, int>> v = vHasValue
             ? Option.Return<Func<int, int>>(item => unchecked(item * 2))
-            : new None();
-        Option<int> w = wHasValue ? Option.Return(value) : new None();
+            : Option.Empty<Func<int, int>>();
+        Option<int> w = wHasValue ? Option.Return(value) : Option.Empty<int>();
 
         Func<Func<int, int>, Func<Func<int, int>, Func<int, int>>> composeFunction =
             ComposeContainer;
@@ -81,14 +81,18 @@ public sealed class ApplicativeLawProperties
     [Test, FsCheckProperty]
     public bool ResultFunctorIdentity(bool isSuccess, int value)
     {
-        Result<int, string> source = isSuccess ? Result.Return<int, string>(value) : "failure";
+        Result<int, string> source = isSuccess
+            ? Result.Return<int, string>(value)
+            : Result.Failure<int, string>("failure");
         return ResultEquivalent(source.Select(item => item), source);
     }
 
     [Test, FsCheckProperty]
     public bool ResultFunctorComposition(bool isSuccess, int value, int offset)
     {
-        Result<int, string> source = isSuccess ? Result.Return<int, string>(value) : "failure";
+        Result<int, string> source = isSuccess
+            ? Result.Return<int, string>(value)
+            : Result.Failure<int, string>("failure");
         var left = source.Select(item => unchecked(item + offset)).Select(item => item * 2);
         var right = source.Select(item => unchecked((item + offset) * 2));
         return ResultEquivalent(left, right);
@@ -97,7 +101,9 @@ public sealed class ApplicativeLawProperties
     [Test, FsCheckProperty]
     public bool ResultApplicativeIdentity(bool isSuccess, int value)
     {
-        Result<int, string> source = isSuccess ? Result.Return<int, string>(value) : "failure";
+        Result<int, string> source = isSuccess
+            ? Result.Return<int, string>(value)
+            : Result.Failure<int, string>("failure");
         Result<Func<int, int>, string> identity =
             Result.Return<Func<int, int>, string>(item => item);
         return ResultEquivalent(identity.Apply(source), source);
@@ -117,7 +123,7 @@ public sealed class ApplicativeLawProperties
     public bool ResultApplicativeInterchange(bool functionFails, int value)
     {
         Result<Func<int, int>, string> function = functionFails
-            ? "function failure"
+            ? Result.Failure<Func<int, int>, string>("function failure")
             : Result.Return<Func<int, int>, string>(item => unchecked(item + 1));
         Result<int, string> argument = Result.Return<int, string>(value);
 
@@ -132,12 +138,14 @@ public sealed class ApplicativeLawProperties
     public bool ResultApplicativeComposition(bool uFails, bool vFails, bool wFails, int value)
     {
         Result<Func<int, int>, string> u = uFails
-            ? "u failure"
+            ? Result.Failure<Func<int, int>, string>("u failure")
             : Result.Return<Func<int, int>, string>(item => unchecked(item + 1));
         Result<Func<int, int>, string> v = vFails
-            ? "v failure"
+            ? Result.Failure<Func<int, int>, string>("v failure")
             : Result.Return<Func<int, int>, string>(item => unchecked(item * 2));
-        Result<int, string> w = wFails ? "w failure" : Result.Return<int, string>(value);
+        Result<int, string> w = wFails
+            ? Result.Failure<int, string>("w failure")
+            : Result.Return<int, string>(value);
 
         Result<Func<Func<int, int>, Func<Func<int, int>, Func<int, int>>>, string> compose =
             Result.Return<Func<Func<int, int>, Func<Func<int, int>, Func<int, int>>>, string>(
@@ -153,7 +161,7 @@ public sealed class ApplicativeLawProperties
     {
         ErrorResult<int, string> source = isFailure
             ? ErrorResult.Return<int, string>("failure")
-            : new Result<int, string>(value).AsErrorResult();
+            : Result.Return<int, string>(value).AsErrorResult();
         return ErrorResultEquivalent(source.Select(error => error), source);
     }
 
@@ -162,7 +170,7 @@ public sealed class ApplicativeLawProperties
     {
         ErrorResult<int, string> source = isFailure
             ? ErrorResult.Return<int, string>("failure")
-            : new Result<int, string>(value).AsErrorResult();
+            : Result.Return<int, string>(value).AsErrorResult();
         var left = source.Select(error => error + "-one").Select(error => error + "-two");
         var right = source.Select(error => error + "-one" + "-two");
         return ErrorResultEquivalent(left, right);
@@ -173,7 +181,7 @@ public sealed class ApplicativeLawProperties
     {
         ErrorResult<string, int> source = isFailure
             ? ErrorResult.Return<string, int>(value)
-            : new Result<string, int>("pass-through").AsErrorResult();
+            : Result.Return<string, int>("pass-through").AsErrorResult();
         ErrorResult<string, Func<int, int>> identity =
             ErrorResult.Return<string, Func<int, int>>(item => item);
         return ErrorResultEquivalent(identity.Apply(source), source);
@@ -194,7 +202,7 @@ public sealed class ApplicativeLawProperties
     {
         ErrorResult<string, Func<int, int>> function = functionFails
             ? ErrorResult.Return<string, Func<int, int>>(item => unchecked(item + 1))
-            : new Result<string, Func<int, int>>("function pass-through").AsErrorResult();
+            : Result.Return<string, Func<int, int>>("function pass-through").AsErrorResult();
         ErrorResult<string, int> argument = ErrorResult.Return<string, int>(value);
 
         var left = function.Apply(argument);
@@ -209,13 +217,13 @@ public sealed class ApplicativeLawProperties
     {
         ErrorResult<string, Func<int, int>> u = uFails
             ? ErrorResult.Return<string, Func<int, int>>(item => unchecked(item + 1))
-            : new Result<string, Func<int, int>>("u pass-through").AsErrorResult();
+            : Result.Return<string, Func<int, int>>("u pass-through").AsErrorResult();
         ErrorResult<string, Func<int, int>> v = vFails
             ? ErrorResult.Return<string, Func<int, int>>(item => unchecked(item * 2))
-            : new Result<string, Func<int, int>>("v pass-through").AsErrorResult();
+            : Result.Return<string, Func<int, int>>("v pass-through").AsErrorResult();
         ErrorResult<string, int> w = wFails
             ? ErrorResult.Return<string, int>(value)
-            : new Result<string, int>("w pass-through").AsErrorResult();
+            : Result.Return<string, int>("w pass-through").AsErrorResult();
 
         ErrorResult<string, Func<Func<int, int>, Func<Func<int, int>, Func<int, int>>>> compose =
             ErrorResult.Return<
@@ -315,15 +323,18 @@ public sealed class ApplicativeLawProperties
     private static bool OptionEquivalent(Option<int> left, Option<int> right) =>
         left switch
         {
-            int leftValue => right is int rightValue && leftValue == rightValue,
+            Some<int> leftSome => right is Some<int> rightSome
+                && leftSome.Value == rightSome.Value,
             None _ => right is None
         };
 
     private static bool ResultEquivalent(Result<int, string> left, Result<int, string> right) =>
         left switch
         {
-            int leftValue => right is int rightValue && leftValue == rightValue,
-            string leftError => right is string rightError && leftError == rightError
+            Success<int> leftSuccess => right is Success<int> rightSuccess
+                && leftSuccess.Value == rightSuccess.Value,
+            Failure<string> leftFailure => right is Failure<string> rightFailure
+                && leftFailure.Value == rightFailure.Value
         };
 
     private static bool ErrorResultEquivalent(
@@ -331,33 +342,39 @@ public sealed class ApplicativeLawProperties
         ErrorResult<string, int> right) =>
         left.ToResult() switch
         {
-            string leftPass => right.ToResult() is string rightPass && leftPass == rightPass,
-            int leftFailure => right.ToResult() is int rightFailure && leftFailure == rightFailure
+            Success<string> leftPass => right.ToResult() is Success<string> rightPass
+                && leftPass.Value == rightPass.Value,
+            Failure<int> leftFailure => right.ToResult() is Failure<int> rightFailure
+                && leftFailure.Value == rightFailure.Value
         };
 
     private static bool ErrorResultEquivalent<TSuccess, TFailure>(
         ErrorResult<TSuccess, TFailure> left,
-        ErrorResult<TSuccess, TFailure> right)
-        where TSuccess : notnull
-        where TFailure : notnull =>
+        ErrorResult<TSuccess, TFailure> right) =>
         left.ToResult() switch
         {
-            TSuccess leftSuccess => right.ToResult() is TSuccess rightSuccess
-                && EqualityComparer<TSuccess>.Default.Equals(leftSuccess, rightSuccess),
-            TFailure leftFailure => right.ToResult() is TFailure rightFailure
-                && EqualityComparer<TFailure>.Default.Equals(leftFailure, rightFailure)
+            Success<TSuccess> leftSuccess => right.ToResult() is Success<TSuccess> rightSuccess
+                && EqualityComparer<TSuccess>.Default.Equals(
+                    leftSuccess.Value,
+                    rightSuccess.Value),
+            Failure<TFailure> leftFailure => right.ToResult() is Failure<TFailure> rightFailure
+                && EqualityComparer<TFailure>.Default.Equals(
+                    leftFailure.Value,
+                    rightFailure.Value)
         };
 
     private static bool ValidationEquivalent<TSuccess>(
         Validation<TSuccess, string> left,
-        Validation<TSuccess, string> right)
-        where TSuccess : notnull =>
+        Validation<TSuccess, string> right) =>
         left switch
         {
-            TSuccess leftValue => right is TSuccess rightValue
-                && EqualityComparer<TSuccess>.Default.Equals(leftValue, rightValue),
-            NonEmptyList<string> leftErrors => right is NonEmptyList<string> rightErrors
-                && leftErrors.SequenceEqual(rightErrors)
+            Success<TSuccess> leftSuccess => right is Success<TSuccess> rightSuccess
+                && EqualityComparer<TSuccess>.Default.Equals(
+                    leftSuccess.Value,
+                    rightSuccess.Value),
+            Failure<NonEmptyList<string>> leftFailure =>
+                right is Failure<NonEmptyList<string>> rightFailure
+                && leftFailure.Value.SequenceEqual(rightFailure.Value)
         };
 
     private static Func<Func<int, int>, Func<int, int>> ComposeContainer(

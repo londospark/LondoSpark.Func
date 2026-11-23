@@ -18,8 +18,9 @@ public sealed class ValidationTests
         var composed = source.Select(value => value + 2).Select(value => value * 3);
         var separate = source.Select(value => (value + 2) * 3);
 
-        await Assert.That(identity).IsEqualTo(7);
-        await Assert.That(composed).IsEqualTo(separate);
+        await Assert.That(identity is Success<int> { Value: 7 }).IsTrue();
+        await Assert.That(composed is Success<int> { Value: 27 }).IsTrue();
+        await Assert.That(separate is Success<int> { Value: 27 }).IsTrue();
     }
 
     [Test]
@@ -29,7 +30,7 @@ public sealed class ValidationTests
             Validation.Return<Func<int, int>, string>(value => value * 6);
         Validation<int, string> value = Validation.Return<int, string>(7);
 
-        await Assert.That(function.Apply(value)).IsEqualTo(42);
+        await Assert.That(function.Apply(value) is Success<int> { Value: 42 }).IsTrue();
     }
 
     [Test]
@@ -74,7 +75,7 @@ public sealed class ValidationTests
 
         var applied = function.Apply(value);
 
-        await Assert.That(applied).IsEqualTo(42);
+        await Assert.That(applied is Success<int> { Value: 42 }).IsTrue();
         await Assert.That(callbackCalled).IsTrue();
     }
 
@@ -93,12 +94,64 @@ public sealed class ValidationTests
         await Assert.That(appended[3]).IsEqualTo("right 2");
     }
 
+    [Test]
+    public async Task ValidationNullSuccessRemainsSuccessfulThroughSelect()
+    {
+        var selectReceivedNull = false;
+        Validation<string?, string?> successNull =
+            Validation.Return<string?, string?>((string?)null);
+
+        var selected = successNull.Select(value =>
+        {
+            selectReceivedNull = value is null;
+            return "selected-null-success";
+        });
+
+        await Assert.That(selectReceivedNull).IsTrue();
+        await Assert.That(selected is Success<string> { Value: "selected-null-success" }).IsTrue();
+    }
+
+    [Test]
+    public async Task ValidationApplyAccumulatesNullableErrorsInOrder()
+    {
+        Validation<Func<int, int>, string?> functionErrors =
+            Validation.Failure<Func<int, int>, string?>((string?)null, "function-error");
+        Validation<int, string?> valueErrors =
+            Validation.Failure<int, string?>((string?)null, "value-error");
+
+        var combined = functionErrors.Apply(valueErrors);
+        var selected = combined.Select(_ => 0);
+
+        if (combined is not Failure<NonEmptyList<string?>> combinedFailure)
+        {
+            throw new InvalidOperationException("Applying two invalid validations must return accumulated errors.");
+        }
+
+        if (selected is not Failure<NonEmptyList<string?>> selectedFailure)
+        {
+            throw new InvalidOperationException("Selecting a failed validation must preserve its errors.");
+        }
+
+        var combinedErrors = combinedFailure.Value;
+        var selectedErrors = selectedFailure.Value;
+
+        await Assert.That(combinedErrors.Count).IsEqualTo(4);
+        await Assert.That(combinedErrors[0] is null).IsTrue();
+        await Assert.That(combinedErrors[1]).IsEqualTo("function-error");
+        await Assert.That(combinedErrors[2] is null).IsTrue();
+        await Assert.That(combinedErrors[3]).IsEqualTo("value-error");
+        await Assert.That(selectedErrors.Count).IsEqualTo(4);
+        await Assert.That(selectedErrors[0] is null).IsTrue();
+        await Assert.That(selectedErrors[1]).IsEqualTo("function-error");
+        await Assert.That(selectedErrors[2] is null).IsTrue();
+        await Assert.That(selectedErrors[3]).IsEqualTo("value-error");
+    }
+
     private static string ValidationErrors<TSuccess>(
-        Validation<TSuccess, string> validation)
-        where TSuccess : notnull =>
+        Validation<TSuccess, string> validation) =>
         validation switch
         {
-            TSuccess _ => "",
-            NonEmptyList<string> errors => string.Join("|", errors)
+            Success<TSuccess> _ => "",
+            Failure<NonEmptyList<string>> errors => string.Join("|", errors.Value)
         };
 }

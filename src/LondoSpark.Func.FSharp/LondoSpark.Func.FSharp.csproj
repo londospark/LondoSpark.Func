@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>0.1.0-prealpha.1</Version>
+    <PackageId>LondoSpark.Func.FSharp</PackageId>
+    <Authors>LondoSpark</Authors>
+    <Description>Typed conversions between LondoSpark.Func and F# standard option and Result types.</Description>
+    <PackageTags>functional;fsharp;option;result</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/londospark/LondoSpark.Func</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/londospark/LondoSpark.Func</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../LondoSpark.Func/LondoSpark.Func.csproj" />
+    <PackageReference Include="FSharp.Core" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

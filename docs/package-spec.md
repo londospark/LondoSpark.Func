@@ -21,8 +21,8 @@ general-purpose functional programming ecosystem.
 
 The dependency-light core:
 
-- `Option<TSome>` with `TSome` and `None` cases.
-- `Result<TSuccess, TFailure>` with success and failure cases.
+- `Option<TSome>` with `Some<TSome>` and `None` cases.
+- `Result<TSuccess, TFailure>` with `Success<TSuccess>` and `Failure<TFailure>` cases.
 - `Return`, `Bind`, and mapping operations.
 - `MapError` and `BindError` for failure-side transformations.
 - `ToOption` conversions from nullable references and nullable value types.
@@ -53,7 +53,8 @@ types. Decide whether Blazor needs a separate package only when its dependencies
 supported targets differ from the ASP.NET Core integration.
 
 Tests and samples should live in separate projects from the distributable library.
-The test project uses TUnit and TUnit.FsCheck on Microsoft Testing Platform.
+The C# test project uses TUnit and TUnit.FsCheck on Microsoft Testing Platform;
+the F# compatibility project is an executable consumer check.
 
 Keep each project in its own directory under `src/`. Put test projects under `tests/`
 and name each after the project it tests, followed by `.Tests` (for example,
@@ -63,17 +64,19 @@ and name each after the project it tests, followed by `.Tests` (for example,
 
 ### Option
 
-`Option<TSome>` represents either a non-null `TSome` or the payload-free `None` case.
-`Option.Return(value)` constructs the present case. `ToOption` maps a non-null value
-to the present case and null to `None`, with overloads for nullable reference and
-nullable value types.
+`Option<TSome>` represents either a present `TSome` or the payload-free `None` case.
+When `TSome` is nullable, `Some(null)` remains distinct from `None`.
+`Option.Return(value)` constructs the present case. `ToOption` maps nullable boundary
+data to the present case when it has a value and to `None` otherwise.
 
 Binding a present value invokes the binder. Binding `None` returns `None` without
 invoking it. Mapping follows the same case behavior.
 
 ### Result
 
-`Result<TSuccess, TFailure>` represents one non-null success or failure value.
+`Result<TSuccess, TFailure>` represents one success or failure value. Nullable
+payloads retain their case identity through the explicit `Success<T>` and
+`Failure<T>` wrappers.
 Success-side `Bind` invokes the binder only for success and preserves failures.
 `MapError` changes a failure value while preserving success. `BindError` invokes its
 binder only for failure and preserves success.
@@ -155,14 +158,16 @@ The first interop release should support:
 - F# `Result<T, E>` to and from `Result<T, E>`.
 
 The adapters should be explicit and typed, with no reflection. They should preserve
-the case and payload exactly for values accepted by the C# types.
+the case and payload exactly, including nullable payloads.
 
 ### Null policy
 
-The core C# types reject nullable payload type arguments through `notnull` constraints,
-but F# can represent `Some null` and null payloads in result cases. Conversion must not
-silently turn `Some null` into `None` or otherwise discard a case. The interop package
-should reject such payloads explicitly and document the failure behavior.
+Nullable reference annotations guide C# callers; the core does not add runtime
+null checks. `Option<T>` and `Result<TSuccess, TFailure>` keep null payloads inside
+their explicit cases, so `Some null`, `Ok null`, and `Error null` remain distinct.
+The F# adapters preserve those cases without reflection. At the CLR boundary,
+F# `None` is represented by a null `FSharpOption<T>` reference; recognizing that
+representation is case decoding, while nullable payloads remain inside their cases.
 
 ### Custom F# discriminated unions
 
@@ -196,7 +201,7 @@ Cover both active and pass-through cases:
 
 Also test the generated LINQ operators against equivalent `Bind`/`Map` expressions,
 including a projector whose input and output types differ. Interop tests should cover
-both conversion directions, every case, and the documented null rejection.
+both conversion directions, every case, and nullable payload preservation.
 
 Keep deterministic regression tests for edge cases alongside FsCheck properties. The
 current unary `SelectMany` operation is the bind operation under test; when an explicit
