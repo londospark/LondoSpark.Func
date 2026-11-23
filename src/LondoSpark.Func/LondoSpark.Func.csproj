@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Version>0.1.0</Version>
+    <PackageId>LondoSpark.Func</PackageId>
+    <AssemblyName>LondoSpark.Func</AssemblyName>
+    <RootNamespace>LondoSpark.Func</RootNamespace>
+    <Nullable>enable</Nullable>
+    <Authors>LondoSpark</Authors>
+    <Description>Small functional primitives for explicit absence and expected failure in C#.</Description>
+    <PackageTags>functional;option;result;fsharp</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/londospark/LondoSpark.Func</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/londospark/LondoSpark.Func</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>
