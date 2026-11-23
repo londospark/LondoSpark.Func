@@ -44,9 +44,9 @@ use F# should not acquire this dependency.
 Tests and samples should live in separate projects from the distributable library.
 The test project uses TUnit and TUnit.FsCheck on Microsoft Testing Platform.
 
-Keep each project in its own directory under `src/`. Put test projects under `Tests/`
+Keep each project in its own directory under `src/`. Put test projects under `tests/`
 and name each after the project it tests, followed by `.Tests` (for example,
-`Tests/LondoSpark.Func.Tests`).
+`tests/LondoSpark.Func.Tests`).
 
 ## 3. Core API and semantics
 

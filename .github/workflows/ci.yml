@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Restore
+        run: dotnet restore LondoSpark.Func.slnx
+
+      - name: Build
+        run: dotnet build LondoSpark.Func.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test LondoSpark.Func.slnx --configuration Release --no-build --no-restore
+
+      - name: Pack
+        run: dotnet pack src/LondoSpark.Func/LondoSpark.Func.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: ${{ runner.temp }}/packages/*.nupkg
+          if-no-files-found: error
