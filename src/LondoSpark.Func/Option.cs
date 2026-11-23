@@ -4,7 +4,62 @@ namespace LondoSpark.Func;
 
 /// <summary>Models a present value or explicit absence; a nullable payload remains present.</summary>
 /// <typeparam name="TSome">The type of the present value.</typeparam>
-public readonly union Option<TSome>(Some<TSome>, None);
+[System.Runtime.CompilerServices.Union]
+public readonly struct Option<TSome>
+{
+    private const byte UninitializedTag = 0;
+    private const byte SomeTag = 1;
+    private const byte NoneTag = 2;
+
+    private readonly Some<TSome> _someValue;
+    private readonly byte _tag;
+
+    /// <summary>Creates the present case containing <paramref name="value"/>.</summary>
+    /// <param name="value">The value to store.</param>
+    public Option(Some<TSome> value)
+    {
+        _someValue = value;
+        _tag = SomeTag;
+    }
+
+    /// <summary>Creates the absent case.</summary>
+    /// <param name="value">The absent case value.</param>
+    public Option(None value)
+    {
+        _someValue = default;
+        _tag = NoneTag;
+    }
+
+    /// <summary>Gets the boxed active case, or <see langword="null"/> for a default-initialized option.</summary>
+    public object? Value =>
+        _tag switch
+        {
+            SomeTag => _someValue,
+            NoneTag => new None(),
+            _ => null
+        };
+
+    /// <summary>Gets whether this option contains an initialized case.</summary>
+    public bool HasValue => _tag != UninitializedTag;
+
+    /// <summary>Gets the present case when this option contains a <see cref="Some{TSome}"/>.</summary>
+    /// <param name="value">Receives the present case, or its default value when this option does not contain it.</param>
+    /// <returns><see langword="true"/> when this option contains a present case.</returns>
+    public bool TryGetValue(out Some<TSome> value)
+    {
+        value = _someValue;
+        return _tag == SomeTag;
+    }
+
+    /// <summary>Gets the absent case when this option contains a <see cref="None"/>.</summary>
+    /// <param name="value">Receives the absent case, or its default value when this option does not contain it.</param>
+    /// <returns><see langword="true"/> when this option contains an absent case.</returns>
+    public bool TryGetValue(out None value)
+    {
+        value = default;
+        return _tag == NoneTag;
+    }
+}
 
 /// <summary>Wraps a present option value, including null.</summary>
 /// <typeparam name="T">The type of the present value.</typeparam>

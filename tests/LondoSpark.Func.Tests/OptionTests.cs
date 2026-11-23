@@ -91,6 +91,17 @@ public sealed class OptionTests
     }
 
     [Test]
+    public async Task OptionDefaultRemainsDistinctFromExplicitNone()
+    {
+        Option<int> defaultOption = default;
+        Option<int> explicitNone = Option.Empty<int>();
+
+        await Assert.That(defaultOption.Value is null).IsTrue();
+        await Assert.That(defaultOption is None).IsFalse();
+        await Assert.That(defaultOption.Equals(explicitNone)).IsFalse();
+    }
+
+    [Test]
     public async Task OptionConvertsNullAndSupportsLinq()
     {
         Option<string> some = "value".ToOption();

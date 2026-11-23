@@ -42,6 +42,11 @@ a payload may be nullable. With nullable checking enabled, F# has corresponding
 nullness types, such as `string | null`, and warns when a nullable value is used
 where a non-null value is expected.
 
+`Option<T>` stores the present case inline and implements the C# union pattern,
+so `Some<T>` / `None` switch expressions retain exhaustive matching without
+boxing the case. Reading its object-typed `Value` protocol property directly
+boxes the case; ordinary case switches use typed accessors instead.
+
 These annotations are compile-time guidance, not runtime validation. The core
 does not add defensive null checks: explicitly nullable values can be carried
 through `Option` and `Result`, but dereferencing or invoking a null payload
@@ -52,17 +57,16 @@ directly constructing a `Some` or a `Success`/`Failure` preserves that case and
 payload.
 
 The local BenchmarkDotNet project is deliberately outside the solution and is
-not run by CI. BenchmarkDotNet's latest stable release does not recognize the
-.NET 11 runtime yet, so use its in-process toolchain to run the benchmarks:
+not run by CI. It uses BenchmarkDotNet 0.16.0-preview.2 for .NET 11 support.
+Run a short comparison of the boxed and inline Option representations with:
 
 ```sh
-dotnet run --project benchmarks/LondoSpark.Func.Benchmarks/LondoSpark.Func.Benchmarks.csproj --configuration Release -- --inProcess
+dotnet run --project benchmarks/LondoSpark.Func.Benchmarks/LondoSpark.Func.Benchmarks.csproj --configuration Release -- --filter '*OptionRepresentationBenchmarks*' --job Short
 ```
 
-The VS Code launch configuration uses the same workaround. Allocation
-measurements are available, but in-process timings are less isolated; avoid
-using them to compare very small performance differences. Use **Ctrl+F5** in
-VS Code to run without attaching the debugger, which can further distort timing.
+Short-run timings are directional; the memory diagnoser is useful for checking
+whether case matching allocates. Use **Ctrl+F5** in VS Code to run without
+attaching the debugger, which can distort timing.
 
 ## Using the library
 
