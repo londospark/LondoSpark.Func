@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Hosting;
 
-// Option describes not-found without a nullable reference, Result describes an
-// expected conflict, and Validation describes a request with field-keyed problems.
-// The ASP.NET helpers in LondoSpark.Func.AspNetCore turn those cases into responses.
+// Option describes not-found without a nullable reference, Validation gathers every
+// field problem in a request, and ToResult hands those errors to a Result pipeline.
+// The ASP.NET helpers in LondoSpark.Func.AspNetCore turn the cases into responses.
 //
 //   dotnet run --project examples/MinimalApi
 //   curl -X POST localhost:5000/customers -H 'content-type: application/json' \
@@ -27,19 +27,19 @@ app.MapGet("/customers", Ok<Customer[]> () => TypedResults.Ok(directory.All.ToAr
 app.MapGet("/customers/{id:int}", IResult (int id) =>
     directory.Find(id).ToHttpResult());
 
-// ToHttpResult is the shorthand when a value maps in one call. When the flow has
-// steps, a switch expression reads better and proves itself exhaustive: adding a
-// case to either union stops this compiling until the new case is handled.
+// Validate, then register, as one pipeline: Bind stops at the first failure and the
+// single switch maps the domain error, naming no generic case types.
 app.MapPost("/customers", IResult (CustomerRequest request) =>
-    CustomerValidation.Validate(request) switch
-    {
-        Success<NewCustomer> validated => directory.Register(validated.Value) switch
-        {
-            Success<Customer> customer =>
-                TypedResults.Created($"/customers/{customer.Value.Id}", customer.Value),
-            Failure<ValidationError> failure => TypedResults.Conflict(failure.Value.Message)
-        },
-        Failure<NonEmptyList<ValidationError>> errors => errors.Value.ToValidationProblem()
-    });
+    CustomerValidation.Validate(request)
+        .Bind(directory.Register)
+        .ToHttpResult(
+            static customer => TypedResults.Created($"/customers/{customer.Id}", customer),
+            static error => error switch
+            {
+                InvalidRequest invalid => invalid.Errors.ToValidationProblem(),
+                AlreadyRegistered taken => TypedResults.Problem(
+                    $"A customer with email '{taken.Email}' already exists.",
+                    statusCode: StatusCodes.Status409Conflict)
+            }));
 
 app.Run();

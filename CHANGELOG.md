@@ -20,9 +20,18 @@ Because it is pre-1.0, a minor version may contain breaking changes.
   expression, which the compiler keeps exhaustive.
 - `NonEmptyList<ValidationError>.ToValidationProblem()` builds the field-keyed `400`
   payload on its own, so a switch expression can handle the failure case directly.
+- `Validation<TSuccess, TValidationError>.ToResult()` converts the accumulated errors
+  into a single failure value, so a validation can feed a `Result` pipeline once
+  gathering finishes.
 - `NonEmptyList<T>.ToSeparatedString(separator)` for turning accumulated errors into
   one message.
 - `Result<TSuccess, TFailure>.ToExitCode()` maps a result to `0` or `1` for CLIs.
+
+### Changed
+
+- The examples model a registration failure as one `CustomerError` union, so the
+  endpoint and the CLI both compose `Validate(...).Bind(Register)` as a pipeline and
+  map the domain error once, instead of nesting a switch per union.
 
 ## [0.2.0-prealpha.2] - 2026-11-24
 

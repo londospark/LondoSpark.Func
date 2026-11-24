@@ -5,16 +5,16 @@ would. They build with the rest of the solution, so they cannot drift from the A
 
 | Example | Project type | Shows |
 | ------- | ------------ | ----- |
-| [`DomainModeling`](DomainModeling) | class library | `Validation` accumulating field-keyed errors, `Option` for lookup, `Result` for expected failure |
+| [`DomainModeling`](DomainModeling) | class library | `Validation` accumulating field-keyed errors, `ToResult` folding them into one domain failure, `Option` for lookup, `Result` for sequencing |
 | [`ConsolePipeline`](ConsolePipeline) | console app | argument parsing with `ToOption`, `Option`/`Result` composition, `ErrorResult` enrichment, `ToSeparatedString`, `ToExitCode` |
-| [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | `ToHttpResult` for a plain map, a switch expression over both unions for the composed flow, and field-keyed `400` problems from `LondoSpark.Func.AspNetCore` |
+| [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | one `Validate(...).Bind(Register).ToHttpResult(...)` pipeline, `ToHttpResult()` for a plain map, and field-keyed `400` problems from `LondoSpark.Func.AspNetCore` |
 | [`JsonSerialization`](JsonSerialization) | console app | `LondoSpark.Func.Json` converters that round-trip `Option<T>` and `Result<TSuccess, TFailure>` |
 | [`FSharpPipeline`](FSharpPipeline) | F# console app | lossless F# `option`/`Result` round-trips through the core types |
 
 ## Running
 
 ```sh
-dotnet run --project examples/ConsolePipeline -- seed
+dotnet run --project examples/ConsolePipeline -- list
 dotnet run --project examples/MinimalApi
 dotnet run --project examples/JsonSerialization
 dotnet run --project examples/FSharpPipeline
@@ -22,16 +22,9 @@ dotnet run --project examples/FSharpPipeline
 
 ## What the examples ask of the library
 
-These projects deliberately do their own glue where the library has no helper yet,
-so the gaps are visible:
+The examples build against the shipped packages, so a helper that is missing shows up
+as glue in the example rather than as a note here. The one piece of glue left:
 
-- **ASP.NET Core results.** `MinimalApi` maps unions to `IResult` by hand. A
-  `LondoSpark.Func.AspNetCore` package could map `Option` → 404, `Result` → a chosen
-  status, and `Validation` → `ValidationProblem` consistently.
-- **CLI exit codes.** `ConsolePipeline` maps a `Result` to a process exit code by
-  hand; a small adapter would remove that boilerplate.
-- **Validation errors as a message.** Turning `NonEmptyList<string>` into a single
-  user-facing sentence is common enough to deserve a helper.
-- **Validation keyed by field.** `ValidationProblem` wants a field-to-messages map,
-  but `Validation<TSuccess, string>` only carries messages. A keyed failure type or a
-  helper would be needed for field-level errors.
+- **Arguments as options.** `ConsolePipeline` calls
+  `args.ElementAtOrDefault(n).ToOption()` for each positional argument, which obscures
+  the intent. A boundary helper for indexed arguments would remove those repetitions.

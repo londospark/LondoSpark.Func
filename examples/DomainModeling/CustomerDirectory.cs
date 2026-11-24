@@ -25,18 +25,17 @@ public sealed class CustomerDirectory
 
     /// <summary>Registers a validated customer, or reports why registration is not possible.</summary>
     /// <param name="candidate">The validated customer.</param>
-    /// <returns>The registered customer, or a field-keyed failure describing the conflict.</returns>
-    public Result<Customer, ValidationError> Register(NewCustomer candidate) =>
+    /// <returns>The registered customer, or a domain error naming the conflict.</returns>
+    public Result<Customer, CustomerError> Register(NewCustomer candidate) =>
         _idsByEmail.ContainsKey(candidate.Email)
-            ? Result.Failure<Customer, ValidationError>(
-                new ValidationError("email", $"A customer with email '{candidate.Email}' already exists."))
+            ? Result.Failure<Customer, CustomerError>(new AlreadyRegistered(candidate.Email))
             : Add(candidate);
 
-    private Result<Customer, ValidationError> Add(NewCustomer candidate)
+    private Result<Customer, CustomerError> Add(NewCustomer candidate)
     {
         var customer = new Customer(_nextId++, candidate.Name, candidate.Email, candidate.Age);
         _customers.Add(customer.Id, customer);
         _idsByEmail.Add(customer.Email, customer.Id);
-        return Result.Return<Customer, ValidationError>(customer);
+        return Result.Return<Customer, CustomerError>(customer);
     }
 }

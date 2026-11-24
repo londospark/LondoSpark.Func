@@ -7,15 +7,17 @@ namespace Examples.DomainModeling;
 /// <summary>Collects every problem with a registration request instead of stopping at the first one.</summary>
 public static class CustomerValidation
 {
-    /// <summary>Validates a request applicatively, accumulating each field failure in order.</summary>
+    /// <summary>Validates a request applicatively, then hands the accumulated errors to the domain pipeline.</summary>
     /// <param name="request">The request to validate.</param>
-    /// <returns>The validated customer, or every field error found.</returns>
-    public static Validation<NewCustomer, ValidationError> Validate(CustomerRequest request) =>
+    /// <returns>The validated customer, or one domain error holding every field problem found.</returns>
+    public static Result<NewCustomer, CustomerError> Validate(CustomerRequest request) =>
         Validation.Return<Func<string, Func<string, Func<int, NewCustomer>>>, ValidationError>(
             name => email => age => new NewCustomer(name, email, age))
             .Apply(RequiredName(request.Name))
             .Apply(RequiredEmail(request.Email))
-            .Apply(RequiredAge(request.Age));
+            .Apply(RequiredAge(request.Age))
+            .ToResult()
+            .MapError(static errors => (CustomerError)new InvalidRequest(errors));
 
     private static Validation<string, ValidationError> RequiredName(string? name) =>
         string.IsNullOrWhiteSpace(name)

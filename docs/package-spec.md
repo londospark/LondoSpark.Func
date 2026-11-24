@@ -64,7 +64,9 @@ Maps unions to HTTP results through a single `ToHttpResult` verb: `Option` to
 `200` or a field-keyed `400` problem. Any validation error type works by projecting
 it onto `ValidationError`, which needs no projection, and
 `NonEmptyList<ValidationError>.ToValidationProblem()` builds that `400` payload for
-flows that switch on the cases themselves. Failure paths allocate the problem payload
+flows that switch on the cases themselves. `Validation<TSuccess, TValidationError>.ToResult()`
+collapses the accumulated errors into a single failure value so a validation can feed a
+sequential `Result` pipeline. Failure paths allocate the problem payload
 only; success paths just wrap the value.
 
 ### `LondoSpark.Func.Json`

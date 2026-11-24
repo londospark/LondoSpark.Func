@@ -57,19 +57,16 @@ Result<string, string> Find(CustomerDirectory directory, string[] args) =>
         None => Result.Failure<string, string>("find requires a customer id.")
     };
 
+// Validate and register as one pipeline, then translate the domain error for the console.
 static Result<string, string> Register(CustomerDirectory directory, CustomerRequest request) =>
-    CustomerValidation.Validate(request) switch
-    {
-        Success<NewCustomer> { Value: var candidate } =>
-            directory.Register(candidate) switch
-            {
-                Success<Customer> { Value: var registered } =>
-                    Result.Return<string, string>($"Registered customer {registered.Id}."),
-                Failure<ValidationError> { Value: var error } => Result.Failure<string, string>(error.ToString())
-            },
-        Failure<NonEmptyList<ValidationError>> errors =>
-            Result.Failure<string, string>(errors.Value.ToSeparatedString(" "))
-    };
+    CustomerValidation.Validate(request)
+        .Bind(directory.Register)
+        .Select(static customer => $"Registered customer {customer.Id}.")
+        .MapError(static error => error switch
+        {
+            InvalidRequest invalid => invalid.Errors.ToSeparatedString(" "),
+            AlreadyRegistered taken => $"Email '{taken.Email}' is already registered."
+        });
 
 static string Describe(Customer customer) =>
     $"#{customer.Id} {customer.Name} <{customer.Email}>, age {customer.Age}";

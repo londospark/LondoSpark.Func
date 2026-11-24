@@ -160,6 +160,41 @@ public sealed class ValidationTests
         await Assert.That(selectedErrors[3]).IsEqualTo("value-error");
     }
 
+    [Test]
+    public async Task ValidationConvertsToAResultSuccess()
+    {
+        var result = Validation.Return<int, string>(7).ToResult();
+
+        await Assert.That(result is Success<int> { Value: 7 }).IsTrue();
+    }
+
+    [Test]
+    public async Task ValidationConvertsToAResultFailureCarryingEveryErrorInOrder()
+    {
+        Validation<int, string> invalid = Validation.Failure<int, string>("name", "email", "age");
+
+        var result = invalid.ToResult();
+
+        var errors = result switch
+        {
+            Failure<NonEmptyList<string>> failure => failure.Value,
+            _ => throw new InvalidOperationException($"Expected a failure but got {result}.")
+        };
+
+        await Assert.That(errors.Count).IsEqualTo(3);
+        await Assert.That(errors[0]).IsEqualTo("name");
+        await Assert.That(errors[1]).IsEqualTo("email");
+        await Assert.That(errors[2]).IsEqualTo("age");
+    }
+
+    [Test]
+    public async Task DefaultValidationCannotConvertToAResult()
+    {
+        Validation<int, string> missing = default;
+
+        await Assert.That(() => missing.ToResult()).Throws<InvalidOperationException>();
+    }
+
     private static string ValidationErrors<TSuccess>(
         Validation<TSuccess, string> validation) =>
         validation switch

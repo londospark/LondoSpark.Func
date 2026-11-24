@@ -92,26 +92,30 @@ form expects:
 app.MapGet("/customers/{id:int}", (int id) => directory.Find(id).ToHttpResult());
 
 app.MapPost("/customers", (CustomerRequest request) =>
-    CustomerValidation.Validate(request) switch
-    {
-        Success<NewCustomer> validated => directory.Register(validated.Value) switch
-        {
-            Success<Customer> customer =>
-                TypedResults.Created($"/customers/{customer.Value.Id}", customer.Value),
-            Failure<ValidationError> failure => TypedResults.Conflict(failure.Value.Message)
-        },
-        Failure<NonEmptyList<ValidationError>> errors => errors.Value.ToValidationProblem()
-    });
+    CustomerValidation.Validate(request)
+        .Bind(directory.Register)
+        .ToHttpResult(
+            customer => TypedResults.Created($"/customers/{customer.Id}", customer),
+            error => error switch
+            {
+                InvalidRequest invalid => invalid.Errors.ToValidationProblem(),
+                AlreadyRegistered taken => TypedResults.Problem(
+                    $"A customer with email '{taken.Email}' already exists.",
+                    statusCode: StatusCodes.Status409Conflict)
+            }));
 ```
 
-`ToHttpResult` is the shorthand when a value maps in one call: an option is `200`
-or `404`, a result is `200` or the result your failure handler returns, and a
-validation is `200` or a field-keyed `400`. When the flow has steps of its own, a
-switch expression reads better and the compiler keeps it exhaustive. Any
-validation error type works by projecting it onto `ValidationError`;
-`Validation<TSuccess, ValidationError>` needs no projection, and
-`NonEmptyList<ValidationError>.ToValidationProblem()` builds the `400` payload for a
-case handled on its own.
+`Validation` gathers problems applicatively; `ToResult()` collapses that list into
+one failure value so the remaining steps sequence with `Bind`. The mapping switch
+names the domain's own error cases, so the boundary reads without generic case
+types to spell out.
+
+`ToHttpResult` is also the shorthand when a value maps in one call: an option is
+`200` or `404`, a result is `200` or the result your failure handler returns, and a
+validation is `200` or a field-keyed `400`. Any validation error type works by
+projecting it onto `ValidationError`; `Validation<TSuccess, ValidationError>` needs
+no projection, and `NonEmptyList<ValidationError>.ToValidationProblem()` builds the
+`400` payload for a case handled on its own.
 `NonEmptyList<T>.ToSeparatedString` joins messages, and `Result.ToExitCode()` maps a
 CLI result to a process exit code.
 
@@ -288,6 +292,9 @@ var calculation =
 Use `AsErrorResult()` when a pipeline should compose on failures instead of
 successes, for example to add context or recover. Convert between `Option<T>`
 and `Result<T, Unit>` when absence is the only failure information required.
+Convert a `Validation<TSuccess, TValidationError>` with `ToResult()` once gathering
+finishes, so the accumulated errors travel as one failure value through the
+sequential steps that follow.
 
 ### ASP.NET Core minimal APIs
 
