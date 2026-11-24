@@ -23,7 +23,7 @@ Console.WriteLine($"some null: {JsonSerializer.Serialize(someNull, options)}");
 
 var someJson = JsonSerializer.Serialize(some, options);
 var someRoundTrip = JsonSerializer.Deserialize<Option<int>>(someJson, options);
-Console.WriteLine($"round-trip: {JsonSerializer.Serialize(someRoundTrip, options)}");
+Console.WriteLine($"round-trip: {someRoundTrip}");
 
 var customer = new Customer(1, "Ada", "ada@example.com", 36);
 Result<Customer, string> success = Result.Return<Customer, string>(customer);
@@ -34,4 +34,4 @@ Console.WriteLine($"failure:   {JsonSerializer.Serialize(failure, options)}");
 
 var failureJson = JsonSerializer.Serialize(failure, options);
 var failureRoundTrip = JsonSerializer.Deserialize<Result<Customer, string>>(failureJson, options);
-Console.WriteLine($"round-trip: {JsonSerializer.Serialize(failureRoundTrip, options)}");
+Console.WriteLine($"round-trip: {failureRoundTrip}");

@@ -18,9 +18,12 @@ let describe (result: Result<int, string>) : string =
     | Error error -> sprintf "failure %s" error
 
 let roundTrip (text: string) : string =
-    text
-    |> parseNumber
-    |> FSharpResultExtensions.ToResult
+    let core = text |> parseNumber |> FSharpResultExtensions.ToResult
+
+    // The core union renders its active case, which keeps logs readable.
+    printfn "core: %O" core
+
+    core
     |> FSharpResultExtensions.ToFSharpResult
     |> describe
 
