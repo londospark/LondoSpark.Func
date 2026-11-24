@@ -176,6 +176,16 @@ public static class ResultExtensions
                 Failure<TFailure> failure => new Failure<TFailure>(failure.Value)
             };
 
+        /// <summary>Maps this result to a process exit code, so a CLI can return failure without its own switch.</summary>
+        /// <returns><c>0</c> for a success; <c>1</c> for a failure or a default result.</returns>
+        public int ToExitCode() =>
+            result switch
+            {
+                Success<TSuccess> => 0,
+                Failure<TFailure> => 1,
+                _ => 1
+            };
+
         /// <summary>Provides query-syntax composition over successful values; use <c>Bind</c> for fluent code.</summary>
         /// <typeparam name="TOut">The success type produced by <paramref name="selector"/>.</typeparam>
         /// <param name="selector">The next computation, invoked only for a success.</param>

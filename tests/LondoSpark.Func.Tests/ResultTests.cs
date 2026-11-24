@@ -231,6 +231,14 @@ public sealed class ResultTests
     }
 
     [Test]
+    public async Task ResultToExitCodeMapsEachCase()
+    {
+        await Assert.That(Result.Return<int, string>(1).ToExitCode()).IsEqualTo(0);
+        await Assert.That(Result.Failure<int, string>("invalid").ToExitCode()).IsEqualTo(1);
+        await Assert.That(default(Result<int, string>).ToExitCode()).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task ResultEqualityComparesCaseAndPayload()
     {
         Result<int, string> success = Result.Return<int, string>(3);

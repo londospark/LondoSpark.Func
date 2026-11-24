@@ -11,6 +11,19 @@ namespace LondoSpark.Func.Tests;
 public sealed class ValidationTests
 {
     [Test]
+    public async Task ValidationErrorsRenderAsFieldKeyedMessages()
+    {
+        var errors = new NonEmptyList<ValidationError>(
+            new ValidationError("name", "Name is required."),
+            new ValidationError("email", "A valid email address is required."));
+
+        await Assert.That(errors.Count).IsEqualTo(2);
+        await Assert.That(errors[0].ToString()).IsEqualTo("name: Name is required.");
+        await Assert.That(errors.ToSeparatedString(" ")).IsEqualTo(
+            "name: Name is required. email: A valid email address is required.");
+    }
+
+    [Test]
     public async Task ValidationFunctorIdentityAndComposition()
     {
         Validation<int, string> source = Validation.Return<int, string>(7);
