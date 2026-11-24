@@ -82,6 +82,14 @@ Short-run timings are directional; the memory diagnoser is useful for checking
 whether case matching allocates. Use **Ctrl+F5** in VS Code to run without
 attaching the debugger, which can distort timing.
 
+## Examples
+
+[`examples/`](examples) contains small projects that use the library the way an
+application would: a domain library, a console pipeline, an ASP.NET Core minimal
+API, `System.Text.Json` converters, and an F# consumer. They build with the
+solution, and their README records the helpers the examples had to write
+themselves.
+
 ## Analyzers
 
 The core package ships a Roslyn analyzer for C# consumers, so no extra reference

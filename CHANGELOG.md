@@ -10,6 +10,9 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ### Added
 
+- `examples/`: a domain library, a console pipeline, an ASP.NET Core minimal API,
+  `System.Text.Json` converters, and an F# consumer. They build with the solution and
+  record the helpers they had to write themselves.
 - `Option<TSome>` and `Result<TSuccess, TFailure>` implement `IEquatable<T>` and expose
   `==`/`!=`. Equality compares the active case and its payload, so comparing two
   options or results no longer falls back to reflection-based `ValueType.Equals`.

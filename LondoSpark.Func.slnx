@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/examples/">
+    <Project Path="examples/ConsolePipeline/ConsolePipeline.csproj" />
+    <Project Path="examples/DomainModeling/DomainModeling.csproj" />
+    <Project Path="examples/FSharpPipeline/FSharpPipeline.fsproj" />
+    <Project Path="examples/JsonSerialization/JsonSerialization.csproj" />
+    <Project Path="examples/MinimalApi/MinimalApi.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/LondoSpark.Func/LondoSpark.Func.csproj" />
     <Project Path="src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj" />
