@@ -65,6 +65,10 @@ unannotated values across interop boundaries does not make them non-null.
 directly constructing a `Some` or a `Success`/`Failure` preserves that case and
 payload.
 
+`Option<TSome>` and `Result<TSuccess, TFailure>` compare structurally: values are
+equal when they hold the same case with equal payloads. They implement
+`IEquatable<T>` and expose `==` and `!=`.
+
 The local BenchmarkDotNet project is deliberately outside the solution and is
 not run by CI. It uses BenchmarkDotNet 0.16.0-preview.2 for .NET 11 support.
 Run a short comparison of the boxed and inline Option and Result

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 using LondoSpark.Func;
@@ -103,6 +104,60 @@ public sealed class OptionTests
     }
 
     [Test]
+    public async Task OptionEqualityComparesCaseAndPayload()
+    {
+        Option<int> some = Option.Return(3);
+        Option<int> sameSome = new Some<int>(3);
+        Option<int> otherSome = Option.Return(4);
+        Option<string?> someNull = Option.Return<string?>(null);
+        Option<string?> noneNull = Option.Empty<string?>();
+
+        await Assert.That(some).IsEqualTo(sameSome);
+        await Assert.That(some == sameSome).IsTrue();
+        await Assert.That(some != otherSome).IsTrue();
+        await Assert.That(some.Equals((object)sameSome)).IsTrue();
+        await Assert.That(some.GetHashCode()).IsEqualTo(sameSome.GetHashCode());
+        await Assert.That(someNull == noneNull).IsFalse();
+        await Assert.That(Option.Empty<int>().GetHashCode()).IsEqualTo(default(Option<int>).GetHashCode());
+    }
+
+    [Test]
+    public async Task NoneValuesAreAlwaysEqual()
+    {
+        None first = new();
+        None second = default;
+        None third = new None();
+
+        await Assert.That(first).IsEqualTo(second);
+        await Assert.That(first).IsEqualTo(third);
+        await Assert.That(first == second).IsTrue();
+        await Assert.That(first != third).IsFalse();
+        await Assert.That(first.GetHashCode()).IsEqualTo(second.GetHashCode());
+        await Assert.That(first.GetHashCode()).IsEqualTo(third.GetHashCode());
+    }
+
+    [Test]
+    public async Task OptionEveryNoneValueIsEqualAndHashesAlike()
+    {
+        Option<int> fromDefault = default;
+        Option<int> fromEmpty = Option.Empty<int>();
+        Option<int> fromNoneCase = new Option<int>(new None());
+        Option<int> fromParameterlessNew = new();
+        Option<string?> fromDefaultNullable = default;
+        Option<string?> fromEmptyNullable = Option.Empty<string?>();
+
+        await Assert.That(fromDefault).IsEqualTo(fromEmpty);
+        await Assert.That(fromEmpty).IsEqualTo(fromNoneCase);
+        await Assert.That(fromNoneCase).IsEqualTo(fromParameterlessNew);
+        await Assert.That(fromDefault == fromParameterlessNew).IsTrue();
+        await Assert.That(fromDefault.GetHashCode()).IsEqualTo(fromEmpty.GetHashCode());
+        await Assert.That(fromEmpty.GetHashCode()).IsEqualTo(fromNoneCase.GetHashCode());
+        await Assert.That(fromNoneCase.GetHashCode()).IsEqualTo(fromParameterlessNew.GetHashCode());
+        await Assert.That(fromDefaultNullable).IsEqualTo(fromEmptyNullable);
+        await Assert.That(fromDefaultNullable.GetHashCode()).IsEqualTo(fromEmptyNullable.GetHashCode());
+    }
+
+    [Test]
     public async Task OptionConvertsNullAndSupportsLinq()
     {
         Option<string> some = "value".ToOption();
@@ -147,7 +202,7 @@ public sealed class OptionTests
     [Test]
     public async Task OptionSomeNullRemainsDistinctFromNone()
     {
-        Option<string?> someNull = Option.Return<string?>((string?)null);
+        Option<string?> someNull = Option.Return<string?>(null);
         Option<string?> none = Option.Empty<string?>();
 
         var observedSome = someNull.Select(value => value is null ? "some-null" : "some-value");
@@ -160,7 +215,7 @@ public sealed class OptionTests
     [Test]
     public async Task OptionSelectPreservesNullPayloadsAndNullResults()
     {
-        Option<string?> someNull = Option.Return<string?>((string?)null);
+        Option<string?> someNull = Option.Return<string?>(null);
 
         var mappedNullPayload = someNull.Select(value =>
             value is null ? "mapped-null-payload" : "unexpected-value");
@@ -176,12 +231,12 @@ public sealed class OptionTests
     public async Task OptionBindReceivesNullAndCanReturnPresentNull()
     {
         var binderReceivedNull = false;
-        Option<string?> someNull = Option.Return<string?>((string?)null);
+        Option<string?> someNull = Option.Return<string?>(null);
 
         var bound = someNull.Bind(value =>
         {
             binderReceivedNull = value is null;
-            return Option.Return<string?>((string?)null);
+            return Option.Return<string?>(null);
         });
         var observedBound = bound.Select(value =>
             value is null ? "bound-some-null" : "unexpected-value");
@@ -206,7 +261,7 @@ public sealed class OptionTests
         Option<Func<string?, string>> function =
             Option.Return<Func<string?, string>>(value =>
                 value is null ? "received-null" : value);
-        Option<string?> someNull = Option.Return<string?>((string?)null);
+        Option<string?> someNull = Option.Return<string?>(null);
 
         var applied = function.Apply(someNull);
 
@@ -216,18 +271,48 @@ public sealed class OptionTests
     [Test]
     public async Task OptionSelectManyComposesNullPayloadsAndPreservesNone()
     {
-        Option<string?> someNull = Option.Return<string?>((string?)null);
+        Option<string?> someNull = Option.Return<string?>(null);
         Option<string?> none = Option.Empty<string?>();
 
         var composed = someNull.SelectMany(
-            _ => Option.Return<string?>((string?)null),
+            _ => Option.Return<string?>(null),
             (first, second) =>
                 first is null && second is null ? "both-options-present-null" : "unexpected-value");
         var absent = none.SelectMany(
-            _ => Option.Return<string?>((string?)null),
+            _ => Option.Return<string?>(null),
             (_, _) => "should-not-be-produced");
 
         await Assert.That(composed is Some<string> { Value: "both-options-present-null" }).IsTrue();
         await Assert.That(absent is None).IsTrue();
+    }
+
+    [Test]
+    public async Task OptionIgnoresPayloadOutsideTheSomeCase()
+    {
+        await Assert.That(Unsafe.SizeOf<Option<int>>()).IsEqualTo(Unsafe.SizeOf<OptionMirror<int>>());
+
+        // The absent case is tag 0. Give the unused present-case slot a value that
+        // None can never carry and confirm the value is still just None.
+        Option<int> noneWithStalePayload = default;
+        Unsafe.As<Option<int>, OptionMirror<int>>(ref noneWithStalePayload) =
+            new(new Some<int>(42), 0);
+
+        await Assert.That(noneWithStalePayload is None).IsTrue();
+        await Assert.That(noneWithStalePayload).IsEqualTo(Option.Empty<int>());
+        await Assert.That(noneWithStalePayload == Option.Empty<int>()).IsTrue();
+        await Assert.That(noneWithStalePayload.GetHashCode()).IsEqualTo(Option.Empty<int>().GetHashCode());
+    }
+
+    private readonly struct OptionMirror<T>
+    {
+        public OptionMirror(Some<T> someValue, byte tag)
+        {
+            SomeValue = someValue;
+            Tag = tag;
+        }
+
+        public Some<T> SomeValue { get; }
+
+        public byte Tag { get; }
     }
 }

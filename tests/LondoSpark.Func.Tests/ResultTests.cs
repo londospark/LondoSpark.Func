@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 using LondoSpark.Func;
@@ -196,9 +197,9 @@ public sealed class ResultTests
     public async Task ResultSuccessNullAndFailureNullRetainDistinctCases()
     {
         Result<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null);
+            Result.Return<string?, string?>(null);
         Result<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
 
         await Assert.That(successNull is Success<string?> { Value: null }).IsTrue();
         await Assert.That(failureNull is Failure<string?> { Value: null }).IsTrue();
@@ -222,14 +223,35 @@ public sealed class ResultTests
     }
 
     [Test]
+    public async Task ResultEqualityComparesCaseAndPayload()
+    {
+        Result<int, string> success = Result.Return<int, string>(3);
+        Result<int, string> sameSuccess = new Success<int>(3);
+        Result<int, string> otherSuccess = Result.Return<int, string>(4);
+        Result<int, string> failure = Result.Failure<int, string>("invalid");
+        Result<int, string> sameFailure = new Failure<string>("invalid");
+        Result<int, string> otherFailure = Result.Failure<int, string>("different");
+
+        await Assert.That(success).IsEqualTo(sameSuccess);
+        await Assert.That(success == sameSuccess).IsTrue();
+        await Assert.That(success != otherSuccess).IsTrue();
+        await Assert.That(success.Equals((object)sameSuccess)).IsTrue();
+        await Assert.That(success.GetHashCode()).IsEqualTo(sameSuccess.GetHashCode());
+        await Assert.That(failure).IsEqualTo(sameFailure);
+        await Assert.That(failure != otherFailure).IsTrue();
+        await Assert.That(failure.GetHashCode()).IsEqualTo(sameFailure.GetHashCode());
+        await Assert.That(success == failure).IsFalse();
+    }
+
+    [Test]
     public async Task ResultSelectMapsNullSuccessAndPreservesNullFailure()
     {
         var selectCalledForSuccess = false;
         var selectCalledForFailure = false;
         Result<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null);
+            Result.Return<string?, string?>(null);
         Result<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
 
         var mappedSuccess = successNull.Select(value =>
         {
@@ -253,14 +275,14 @@ public sealed class ResultTests
     {
         var binderReceivedNull = false;
         Result<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null);
+            Result.Return<string?, string?>(null);
         Result<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
 
         var boundSuccess = successNull.Bind(value =>
         {
             binderReceivedNull = value is null;
-            return Result.Return<string?, string?>((string?)null);
+            return Result.Return<string?, string?>(null);
         });
 
         var failureBinderCalled = false;
@@ -281,15 +303,15 @@ public sealed class ResultTests
     {
         var errorBinderCalledForSuccess = false;
         Result<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null);
+            Result.Return<string?, string?>(null);
         Result<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
 
         var mappedSuccess = successNull.MapError(_ => "should-not-be-produced");
         var mappedFailure = failureNull.MapError(error =>
             error is null ? "mapped-null-failure" : "unexpected-error");
         var recoveredFailure = failureNull.BindError(_ =>
-            Result.Return<string?, string?>((string?)null));
+            Result.Return<string?, string?>(null));
         var preservedSuccess = successNull.BindError(_ =>
         {
             errorBinderCalledForSuccess = true;
@@ -310,11 +332,11 @@ public sealed class ResultTests
             Result.Return<Func<string?, string>, string?>(value =>
                 value is null ? "function-received-null" : value);
         Result<string?, string?> valueSuccess =
-            Result.Return<string?, string?>((string?)null);
+            Result.Return<string?, string?>(null);
         Result<Func<string?, string>, string?> functionFailure =
-            Result.Failure<Func<string?, string>, string?>((string?)null);
+            Result.Failure<Func<string?, string>, string?>(null);
         Result<string?, string?> valueFailure =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
 
         var appliedSuccess = functionSuccess.Apply(valueSuccess);
         var functionFailureResult = functionFailure.Apply(valueSuccess);
@@ -330,14 +352,14 @@ public sealed class ResultTests
     {
         var projectorCalled = false;
         Result<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null);
+            Result.Return<string?, string?>(null);
         Result<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
         Result<string?, string?> secondFailureNull =
-            Result.Failure<string?, string?>((string?)null);
+            Result.Failure<string?, string?>(null);
 
         var composedSuccess = successNull.SelectMany(
-            _ => Result.Return<string?, string?>((string?)null),
+            _ => Result.Return<string?, string?>(null),
             (first, second) =>
             {
                 projectorCalled = true;
@@ -354,5 +376,39 @@ public sealed class ResultTests
         await Assert.That(composedFailure is Failure<string?> { Value: null }).IsTrue();
         await Assert.That(composedSecondFailure is Failure<string?> { Value: null }).IsTrue();
         await Assert.That(projectorCalled).IsTrue();
+    }
+
+    [Test]
+    public async Task ResultIgnoresPayloadOutsideItsActiveCase()
+    {
+        await Assert.That(Unsafe.SizeOf<Result<int, int>>()).IsEqualTo(Unsafe.SizeOf<ResultMirror>());
+
+        // Success is tag 1. Fill the unused failure slot with a value that Success
+        // can never carry and confirm the value is still just the same success.
+        Result<int, int> successWithStaleFailure = Result.Return<int, int>(1);
+        Unsafe.As<Result<int, int>, ResultMirror>(ref successWithStaleFailure) =
+            new(new Success<int>(1), new Failure<int>(99), 1);
+
+        await Assert.That(successWithStaleFailure is Success<int> { Value: 1 }).IsTrue();
+        await Assert.That(successWithStaleFailure).IsEqualTo(Result.Return<int, int>(1));
+        await Assert.That(successWithStaleFailure == Result.Return<int, int>(1)).IsTrue();
+        await Assert.That(successWithStaleFailure.GetHashCode())
+            .IsEqualTo(Result.Return<int, int>(1).GetHashCode());
+    }
+
+    private readonly struct ResultMirror
+    {
+        public ResultMirror(Success<int> successValue, Failure<int> failureValue, byte tag)
+        {
+            SuccessValue = successValue;
+            FailureValue = failureValue;
+            Tag = tag;
+        }
+
+        public Success<int> SuccessValue { get; }
+
+        public Failure<int> FailureValue { get; }
+
+        public byte Tag { get; }
     }
 }

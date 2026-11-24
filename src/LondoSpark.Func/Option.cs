@@ -1,13 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace LondoSpark.Func;
 
 /// <summary>Models a present value or explicit absence; a nullable payload remains present.</summary>
 /// <typeparam name="TSome">The type of the present value.</typeparam>
-/// <remarks>Every value, including <see langword="default"/> and <c>new()</c>, contains a case; the zero value is <see cref="None"/>.</remarks>
+/// <remarks>
+/// Every value, including <see langword="default"/> and <c>new()</c>, contains a case; the zero value is <see cref="None"/>.
+/// Equality compares the active case and its payload.
+/// </remarks>
 [Union]
-public readonly struct Option<TSome>
+public readonly struct Option<TSome> : IEquatable<Option<TSome>>
 {
     private const byte NoneTag = 0;
     private const byte SomeTag = 1;
@@ -35,7 +39,7 @@ public readonly struct Option<TSome>
 
     /// <summary>Gets the boxed active case; never <see langword="null"/>.</summary>
     public object Value =>
-        _tag == SomeTag ? (object)_someValue : new None();
+        _tag == SomeTag ? _someValue : new None();
 
     /// <summary>Gets a value indicating whether this option contains a case; always <see langword="true"/> because <see langword="default"/> is <see cref="None"/>.</summary>
     public bool HasValue => true;
@@ -57,6 +61,35 @@ public readonly struct Option<TSome>
         value = default;
         return _tag == NoneTag;
     }
+
+    /// <summary>Determines whether this option has the same case and an equal payload as <paramref name="other"/>.</summary>
+    /// <param name="other">The option to compare.</param>
+    /// <returns><see langword="true"/> when both options contain the same case with equal payloads.</returns>
+    public bool Equals(Option<TSome> other) =>
+        _tag == other._tag
+        && (_tag != SomeTag || EqualityComparer<Some<TSome>>.Default.Equals(_someValue, other._someValue));
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) =>
+        obj is Option<TSome> other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() =>
+        _tag == SomeTag ? HashCode.Combine(SomeTag, _someValue) : NoneTag;
+
+    /// <summary>Determines whether two options are equal.</summary>
+    /// <param name="left">The first option.</param>
+    /// <param name="right">The second option.</param>
+    /// <returns><see langword="true"/> when both options contain the same case with equal payloads.</returns>
+    public static bool operator ==(Option<TSome> left, Option<TSome> right) =>
+        left.Equals(right);
+
+    /// <summary>Determines whether two options are not equal.</summary>
+    /// <param name="left">The first option.</param>
+    /// <param name="right">The second option.</param>
+    /// <returns><see langword="true"/> when the options differ in case or payload.</returns>
+    public static bool operator !=(Option<TSome> left, Option<TSome> right) =>
+        !left.Equals(right);
 }
 
 /// <summary>Wraps a present option value, including null.</summary>

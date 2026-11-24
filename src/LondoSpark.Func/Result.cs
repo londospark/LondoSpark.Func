@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace LondoSpark.Func;
@@ -10,9 +11,10 @@ namespace LondoSpark.Func;
 /// Every value created by <c>Result.Return</c> or <c>Result.Failure</c> contains a case. Because this is a struct,
 /// <see langword="default"/> and <c>new()</c> produce a zero value that contains no case: <see cref="HasValue"/> is
 /// <see langword="false"/>, the case patterns do not match, and <see cref="Value"/> throws.
+/// Equality compares the active case and its payload.
 /// </remarks>
 [Union]
-public readonly struct Result<TSuccess, TFailure>
+public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, TFailure>>
 {
     private const byte SuccessTag = 1;
     private const byte FailureTag = 2;
@@ -68,6 +70,45 @@ public readonly struct Result<TSuccess, TFailure>
         value = _failureValue;
         return _tag == FailureTag;
     }
+
+    /// <summary>Determines whether this result has the same case and an equal payload as <paramref name="other"/>.</summary>
+    /// <param name="other">The result to compare.</param>
+    /// <returns><see langword="true"/> when both results contain the same case with equal payloads.</returns>
+    public bool Equals(Result<TSuccess, TFailure> other) =>
+        _tag == other._tag
+        && (_tag switch
+        {
+            SuccessTag => EqualityComparer<Success<TSuccess>>.Default.Equals(_successValue, other._successValue),
+            FailureTag => EqualityComparer<Failure<TFailure>>.Default.Equals(_failureValue, other._failureValue),
+            _ => true
+        });
+
+    /// <inheritdoc/>
+    public override bool Equals(object? obj) =>
+        obj is Result<TSuccess, TFailure> other && Equals(other);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() =>
+        _tag switch
+        {
+            SuccessTag => HashCode.Combine(SuccessTag, _successValue),
+            FailureTag => HashCode.Combine(FailureTag, _failureValue),
+            _ => _tag
+        };
+
+    /// <summary>Determines whether two results are equal.</summary>
+    /// <param name="left">The first result.</param>
+    /// <param name="right">The second result.</param>
+    /// <returns><see langword="true"/> when both results contain the same case with equal payloads.</returns>
+    public static bool operator ==(Result<TSuccess, TFailure> left, Result<TSuccess, TFailure> right) =>
+        left.Equals(right);
+
+    /// <summary>Determines whether two results are not equal.</summary>
+    /// <param name="left">The first result.</param>
+    /// <param name="right">The second result.</param>
+    /// <returns><see langword="true"/> when the results differ in case or payload.</returns>
+    public static bool operator !=(Result<TSuccess, TFailure> left, Result<TSuccess, TFailure> right) =>
+        !left.Equals(right);
 }
 
 /// <summary>Wraps a successful result value, including null.</summary>

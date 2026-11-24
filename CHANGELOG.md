@@ -8,6 +8,12 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `Option<TSome>` and `Result<TSuccess, TFailure>` implement `IEquatable<T>` and expose
+  `==`/`!=`. Equality compares the active case and its payload, so comparing two
+  options or results no longer falls back to reflection-based `ValueType.Equals`.
+
 ## [0.2.0-prealpha.1] - 2026-11-24
 
 First release containing the inline union representation, the analyzer, and the F#
