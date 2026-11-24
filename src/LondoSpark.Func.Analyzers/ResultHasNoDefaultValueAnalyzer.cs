@@ -27,7 +27,8 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
         "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "A default, empty new, or zero-initialised Result contains no case: neither case pattern matches and reading Value throws.");
+        description: "A default, empty new, or zero-initialised Result contains no case: neither case pattern matches and reading Value throws.",
+        helpLinkUri: "https://github.com/londospark/LondoSpark.Func/blob/main/README.md#analyzers");
 
     /// <inheritdoc/>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
