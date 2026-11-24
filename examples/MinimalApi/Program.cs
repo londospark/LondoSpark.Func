@@ -25,7 +25,7 @@ var directory = new CustomerDirectory();
 app.MapGet("/customers", Ok<Customer[]> () => TypedResults.Ok(directory.All.ToArray()));
 
 app.MapGet("/customers/{id:int}", IResult (int id) =>
-    directory.Find(id).ToOkOrNotFound());
+    directory.Find(id).ToHttpResult());
 
 app.MapPost("/customers", IResult (CustomerRequest request) =>
     CustomerValidation.Validate(request).ToHttpResult(

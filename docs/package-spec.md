@@ -59,11 +59,11 @@ conditions are evaluated after every property.
 
 ### `LondoSpark.Func.AspNetCore`
 
-Maps unions to HTTP results: `Option` to `200`/`404`, `Result` to a chosen status
-with a problem detail, and `Validation` to a field-keyed `400` problem. The mapping
-is generic over the error type through selectors, with overloads for
-`ValidationError` that need none. Failure paths allocate the problem payload only;
-success paths just wrap the value.
+Maps unions to HTTP results through a single `ToHttpResult` verb: `Option` to
+`200`/`404`, `Result` to `200` or the caller's failure result, and `Validation` to
+`200` or a field-keyed `400` problem. Any validation error type works by projecting
+it onto `ValidationError`, which needs no projection. Failure paths allocate the
+problem payload only; success paths just wrap the value.
 
 ### `LondoSpark.Func.Json`
 

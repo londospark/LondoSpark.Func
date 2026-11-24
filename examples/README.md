@@ -7,7 +7,7 @@ would. They build with the rest of the solution, so they cannot drift from the A
 | ------- | ------------ | ----- |
 | [`DomainModeling`](DomainModeling) | class library | `Validation` accumulating field-keyed errors, `Option` for lookup, `Result` for expected failure |
 | [`ConsolePipeline`](ConsolePipeline) | console app | argument parsing with `ToOption`, `Option`/`Result` composition, `ErrorResult` enrichment, `ToSeparatedString`, `ToExitCode` |
-| [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | `ToOkOrNotFound`, `ToHttpResult`, and field-keyed `400` problems from `LondoSpark.Func.AspNetCore` |
+| [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | `ToHttpResult` for options, results, and field-keyed `400` problems from `LondoSpark.Func.AspNetCore` |
 | [`JsonSerialization`](JsonSerialization) | console app | `LondoSpark.Func.Json` converters that round-trip `Option<T>` and `Result<TSuccess, TFailure>` |
 | [`FSharpPipeline`](FSharpPipeline) | F# console app | lossless F# `option`/`Result` round-trips through the core types |
 

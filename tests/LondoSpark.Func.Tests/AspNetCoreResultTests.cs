@@ -15,8 +15,8 @@ public sealed class AspNetCoreResultTests
     [Test]
     public async Task OptionMapsToOkOrNotFound()
     {
-        var present = Option.Return(42).ToOkOrNotFound();
-        var absent = Option.Empty<int>().ToOkOrNotFound();
+        var present = Option.Return(42).ToHttpResult();
+        var absent = Option.Empty<int>().ToHttpResult();
 
         await Assert.That(present is Ok<int> { Value: 42 }).IsTrue();
         await Assert.That(absent is NotFound).IsTrue();
@@ -32,45 +32,50 @@ public sealed class AspNetCoreResultTests
     }
 
     [Test]
-    public async Task ResultMapsSuccessAndFailure()
+    public async Task ResultMapsToOkOrCallerSuppliedFailure()
     {
-        var success = Result.Return<int, ValidationError>(7).ToOkOrProblem(
-            StatusCodes.Status409Conflict,
-            static error => error.Message);
-        var failure = Result.Failure<int, ValidationError>(new ValidationError("email", "duplicate")).ToOkOrProblem(
-            StatusCodes.Status409Conflict,
-            static error => error.Message);
+        var success = Result.Return<int, ValidationError>(7).ToHttpResult(
+            static error => TypedResults.Conflict(error.Message));
+        var failure = Result.Failure<int, ValidationError>(new ValidationError("email", "duplicate")).ToHttpResult(
+            static error => TypedResults.Conflict(error.Message));
 
         await Assert.That(success is Ok<int> { Value: 7 }).IsTrue();
-        await Assert.That(failure is ProblemHttpResult { StatusCode: StatusCodes.Status409Conflict }).IsTrue();
-        await Assert.That(((ProblemHttpResult)failure).ProblemDetails.Detail).IsEqualTo("duplicate");
+        await Assert.That(failure is Conflict<string> { Value: "duplicate" }).IsTrue();
     }
 
     [Test]
-    public async Task ValidationMapsSuccessToOk()
+    public async Task ResultHonoursCallerSuppliedSuccessAndFailure()
     {
-        var result = Validation.Return<int, ValidationError>(7).ToOkOrValidationProblem();
+        var created = Result.Return<int, ValidationError>(7).ToHttpResult(
+            static value => TypedResults.Created($"/items/{value}", value),
+            static error => TypedResults.Conflict(error.Message));
+        var conflict = Result.Failure<int, ValidationError>(new ValidationError("email", "duplicate")).ToHttpResult(
+            static value => TypedResults.Created($"/items/{value}", value),
+            static error => TypedResults.Conflict(error.Message));
 
-        await Assert.That(result is Ok<int> { Value: 7 }).IsTrue();
+        await Assert.That(created is Created<int> { Value: 7 }).IsTrue();
+        await Assert.That(conflict is Conflict<string> { Value: "duplicate" }).IsTrue();
     }
 
     [Test]
-    public async Task ValidationGroupsErrorsByField()
+    public async Task ValidationMapsToOkOrFieldKeyedProblem()
     {
         Validation<int, ValidationError> invalid = Validation.Failure<int, ValidationError>(
             new ValidationError("name", "Name is required."),
             new ValidationError("email", "A valid email address is required."),
             new ValidationError("name", "Name is too long."));
 
-        var result = invalid.ToOkOrValidationProblem();
+        var valid = Validation.Return<int, ValidationError>(7).ToHttpResult();
+        var problem = invalid.ToHttpResult();
 
-        await Assert.That(result is ValidationProblem).IsTrue();
+        await Assert.That(valid is Ok<int> { Value: 7 }).IsTrue();
+        await Assert.That(problem is ValidationProblem).IsTrue();
 
-        var problem = (ValidationProblem)result;
-        await Assert.That(problem.ProblemDetails.Errors["name"].Length).IsEqualTo(2);
-        await Assert.That(problem.ProblemDetails.Errors["name"][0]).IsEqualTo("Name is required.");
-        await Assert.That(problem.ProblemDetails.Errors["name"][1]).IsEqualTo("Name is too long.");
-        await Assert.That(problem.ProblemDetails.Errors["email"][0]).IsEqualTo("A valid email address is required.");
+        var details = ((ValidationProblem)problem).ProblemDetails;
+        await Assert.That(details.Errors["name"].Length).IsEqualTo(2);
+        await Assert.That(details.Errors["name"][0]).IsEqualTo("Name is required.");
+        await Assert.That(details.Errors["name"][1]).IsEqualTo("Name is too long.");
+        await Assert.That(details.Errors["email"][0]).IsEqualTo("A valid email address is required.");
     }
 
     [Test]
@@ -83,13 +88,11 @@ public sealed class AspNetCoreResultTests
     }
 
     [Test]
-    public async Task ValidationSupportsCustomErrorTypes()
+    public async Task ValidationProjectsCustomErrorsOntoFields()
     {
         Validation<int, string> invalid = Validation.Failure<int, string>("first", "second");
 
-        var result = invalid.ToOkOrValidationProblem(
-            static _ => "custom",
-            static error => error);
+        var result = invalid.ToHttpResult(static error => new ValidationError("custom", error));
 
         await Assert.That(result is ValidationProblem).IsTrue();
         await Assert.That(((ValidationProblem)result).ProblemDetails.Errors["custom"].Length).IsEqualTo(2);

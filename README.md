@@ -89,7 +89,7 @@ carries a field name and a message, so a validation problem is grouped the way a
 form expects:
 
 ```csharp
-app.MapGet("/customers/{id:int}", (int id) => directory.Find(id).ToOkOrNotFound());
+app.MapGet("/customers/{id:int}", (int id) => directory.Find(id).ToHttpResult());
 
 app.MapPost("/customers", (CustomerRequest request) =>
     CustomerValidation.Validate(request).ToHttpResult(
@@ -98,10 +98,13 @@ app.MapPost("/customers", (CustomerRequest request) =>
             error => TypedResults.Conflict(error.Message))));
 ```
 
-A result maps with `ToOkOrProblem(status, error => error.Message)`, and
-`Validation<TSuccess, TValidationError>` accepts selectors for any custom error
-type. `NonEmptyList<T>.ToSeparatedString` joins messages, and
-`Result.ToExitCode()` maps a CLI result to a process exit code.
+One `ToHttpResult` verb covers every union; the overload decides the mapping. An
+option is `200` or `404`, a result is `200` or the result your failure handler
+returns, and a validation is `200` or a field-keyed `400`. Any validation error
+type works by projecting it onto `ValidationError`;
+`Validation<TSuccess, ValidationError>` needs no projection.
+`NonEmptyList<T>.ToSeparatedString` joins messages, and `Result.ToExitCode()` maps a
+CLI result to a process exit code.
 
 The local BenchmarkDotNet project is deliberately outside the solution and is
 not run by CI. It uses BenchmarkDotNet 0.16.0-preview.2 for .NET 11 support.

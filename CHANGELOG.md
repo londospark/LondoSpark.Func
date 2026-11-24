@@ -12,9 +12,11 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 - `ValidationError`, a `(Field, Message)` error that renders as `field: message`, so
   validation failures can be reported per input.
-- `LondoSpark.Func.AspNetCore`: `Option` maps to `200`/`404`, `Result` maps to a
-  chosen status with a problem detail, and `Validation` maps to a field-keyed `400`
-  problem. Any error type works through selectors; `ValidationError` needs none.
+- `LondoSpark.Func.AspNetCore`: one `ToHttpResult` verb maps unions to responses.
+  `Option` becomes `200`/`404`, `Result` becomes `200` or the result your failure
+  handler returns, and `Validation` becomes `200` or a field-keyed `400`. Any
+  validation error type works by projecting it onto `ValidationError`, which needs no
+  projection.
 - `NonEmptyList<T>.ToSeparatedString(separator)` for turning accumulated errors into
   one message.
 - `Result<TSuccess, TFailure>.ToExitCode()` maps a result to `0` or `1` for CLIs.
