@@ -4,7 +4,7 @@
     <TargetFramework>net11.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>0.2.0-prealpha.1</Version>
+    <Version>0.2.0-prealpha.2</Version>
     <PackageId>LondoSpark.Func.FSharp</PackageId>
     <Authors>LondoSpark</Authors>
     <Description>Typed conversions between LondoSpark.Func and F# standard option and Result types.</Description>

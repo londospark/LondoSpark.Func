@@ -146,7 +146,8 @@ yourself to a `GlobalUsings.cs`.
 
 Both packages deliver the analyzer and the global using. `LondoSpark.Func.FSharp`
 depends on the whole of `LondoSpark.Func`, so referencing the F# package alone is
-enough for C# code in the same project.
+enough for C# code in the same project. `LondoSpark.Func.Json` adds
+`global using LondoSpark.Func.Json;` under the same switch.
 
 ## Pre-release risks
 

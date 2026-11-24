@@ -7,7 +7,7 @@
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsPackable>false</IsPackable>
-    <Version>0.2.0-prealpha.1</Version>
+    <Version>0.2.0-prealpha.2</Version>
   </PropertyGroup>
 
   <ItemGroup>

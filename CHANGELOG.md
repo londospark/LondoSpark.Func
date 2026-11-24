@@ -8,21 +8,24 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.2.0-prealpha.2] - 2026-11-24
+
 ### Added
 
-- `LondoSpark.Func.Json`: `System.Text.Json` converters for `Option<TSome>` and
-  `Result<TSuccess, TFailure>`, with converter factories so one registration covers
-  every closed type. `Option` is `null` for `None` and `{"some": value}` for `Some`;
-  a result is `{"success": value}` or `{"failure": error}`. Reading is streaming and
-  allocates no document.
-- `ToString()` on `Option<TSome>` and `Result<TSuccess, TFailure>` renders the active
-  case (`Some(42)`, `None`, `Success(42)`, `Failure(error)`).
+- `Option<TSome>` and `Result<TSuccess, TFailure>` implement `IEquatable<T>` and expose
+  `==`/`!=`. Equality compares the active case and its payload, so the inactive payload
+  is ignored and comparing two options or results no longer falls back to
+  reflection-based `ValueType.Equals`; `GetHashCode` hashes only the active case.
+- `ToString()` on both unions renders the active case (`Some(42)`, `None`,
+  `Success(42)`, `Failure(error)`, `Result(default)`), so logs are readable.
+- `LondoSpark.Func.Json`: `System.Text.Json` converters with factories, so one
+  registration covers every closed generic type. `Option` is `null` for `None` and
+  `{"some": value}` for `Some`; a result is `{"success": value}` or
+  `{"failure": error}`. Reading is streaming and allocates no document. The package
+  adds its own implicit using, controlled by `LondoSparkFuncImplicitUsings`.
 - `examples/`: a domain library, a console pipeline, an ASP.NET Core minimal API, a
   JSON round-trip, and an F# consumer. They build with the solution and record the
   helpers they had to write themselves.
-- `Option<TSome>` and `Result<TSuccess, TFailure>` implement `IEquatable<T>` and expose
-  `==`/`!=`. Equality compares the active case and its payload, so comparing two
-  options or results no longer falls back to reflection-based `ValueType.Equals`.
 
 ## [0.2.0-prealpha.1] - 2026-11-24
 
@@ -81,7 +84,8 @@ iterations that were never tagged or published; their changes are folded in here
 - `Option<TSome>`, `Result<TSuccess, TFailure>`, `ErrorResult<TSuccess, TFailure>`,
   `Unit`, LINQ query operators, and `Option`/`Result` conversions.
 
-[Unreleased]: https://github.com/londospark/LondoSpark.Func/compare/v0.2.0-prealpha.1...HEAD
+[Unreleased]: https://github.com/londospark/LondoSpark.Func/compare/v0.2.0-prealpha.2...HEAD
+[0.2.0-prealpha.2]: https://github.com/londospark/LondoSpark.Func/compare/v0.2.0-prealpha.1...v0.2.0-prealpha.2
 [0.2.0-prealpha.1]: https://github.com/londospark/LondoSpark.Func/compare/v0.0.1-prealpha.2...v0.2.0-prealpha.1
 [0.0.1-prealpha.2]: https://github.com/londospark/LondoSpark.Func/compare/v0.0.1-prealpha.1...v0.0.1-prealpha.2
 [0.0.1-prealpha.1]: https://github.com/londospark/LondoSpark.Func/releases/tag/v0.0.1-prealpha.1

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Version>0.2.0-prealpha.1</Version>
+    <Version>0.2.0-prealpha.2</Version>
     <PackageId>LondoSpark.Func.Json</PackageId>
     <AssemblyName>LondoSpark.Func.Json</AssemblyName>
     <RootNamespace>LondoSpark.Func.Json</RootNamespace>
@@ -25,6 +25,8 @@
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
     <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="buildTransitive/LondoSpark.Func.Json.props" Pack="true" PackagePath="buildTransitive/" />
+    <None Include="buildTransitive/LondoSpark.Func.Json.targets" Pack="true" PackagePath="buildTransitive/" />
   </ItemGroup>
 
 </Project>
