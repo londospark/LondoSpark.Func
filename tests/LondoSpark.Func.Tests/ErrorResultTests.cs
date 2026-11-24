@@ -132,9 +132,9 @@ public sealed class ErrorResultTests
     {
         var selectCalledForSuccess = false;
         ErrorResult<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null).AsErrorResult();
+            Result.Return<string?, string?>(null).AsErrorResult();
         ErrorResult<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null).AsErrorResult();
+            Result.Failure<string?, string?>(null).AsErrorResult();
 
         var mappedSuccess = successNull.Select(_ =>
         {
@@ -155,14 +155,14 @@ public sealed class ErrorResultTests
         var binderReceivedNull = false;
         var binderCalledForSuccess = false;
         ErrorResult<string?, string?> failureNull =
-            Result.Failure<string?, string?>((string?)null).AsErrorResult();
+            Result.Failure<string?, string?>(null).AsErrorResult();
         ErrorResult<string?, string?> successNull =
-            Result.Return<string?, string?>((string?)null).AsErrorResult();
+            Result.Return<string?, string?>(null).AsErrorResult();
 
         var recovered = failureNull.BindError(error =>
         {
             binderReceivedNull = error is null;
-            return Result.Return<string?, string?>((string?)null).AsErrorResult();
+            return Result.Return<string?, string?>(null).AsErrorResult();
         });
         var passedThrough = successNull.BindError(_ =>
         {
@@ -180,12 +180,12 @@ public sealed class ErrorResultTests
     public async Task ErrorResultApplyPassesNullSuccessAndMapsNullFailure()
     {
         ErrorResult<string?, Func<string?, string>> successFunction =
-            Result.Return<string?, Func<string?, string>>((string?)null).AsErrorResult();
+            Result.Return<string?, Func<string?, string>>(null).AsErrorResult();
         ErrorResult<string?, Func<string?, string>> failureFunction =
             Result.Failure<string?, Func<string?, string>>(value =>
                 value is null ? "function-received-null-error" : value).AsErrorResult();
         ErrorResult<string?, string?> nullFailure =
-            Result.Failure<string?, string?>((string?)null).AsErrorResult();
+            Result.Failure<string?, string?>(null).AsErrorResult();
 
         var passedThrough = successFunction.Apply(nullFailure);
         var appliedFailure = failureFunction.Apply(nullFailure);
@@ -198,13 +198,13 @@ public sealed class ErrorResultTests
     public async Task ErrorResultSelectManyPropagatesNullPassThroughAndFailurePayloads()
     {
         ErrorResult<string?, string?> sourceSuccess =
-            Result.Return<string?, string?>((string?)null).AsErrorResult();
+            Result.Return<string?, string?>(null).AsErrorResult();
         ErrorResult<string?, string?> sourceFailure =
-            Result.Failure<string?, string?>((string?)null).AsErrorResult();
+            Result.Failure<string?, string?>(null).AsErrorResult();
         ErrorResult<string?, string?> nestedSuccess =
-            Result.Return<string?, string?>((string?)null).AsErrorResult();
+            Result.Return<string?, string?>(null).AsErrorResult();
         ErrorResult<string?, string?> nestedFailure =
-            Result.Failure<string?, string?>((string?)null).AsErrorResult();
+            Result.Failure<string?, string?>(null).AsErrorResult();
 
         var sourceSuccessPassThrough = sourceSuccess.SelectMany(
             _ => nestedFailure,

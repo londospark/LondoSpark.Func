@@ -2,6 +2,8 @@ using System;
 using BenchmarkDotNet.Attributes;
 using LondoSpark.Func;
 
+namespace LondoSpark.Func.Benchmarks;
+
 [MemoryDiagnoser]
 public class OptionCompositionBenchmarks
 {

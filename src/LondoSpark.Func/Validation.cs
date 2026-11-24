@@ -1,12 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LondoSpark.Func;
 
 /// <summary>Collects independent validation errors applicatively instead of failing at the first one; payloads may be nullable.</summary>
 /// <typeparam name="TSuccess">The type of a valid value.</typeparam>
 /// <typeparam name="TFailure">The type of an individual validation error.</typeparam>
+[SuppressMessage(
+    "Performance",
+    "CA1815:Override equals and operator equals on value types",
+    Justification = "The failure case holds a NonEmptyList reference, so structural equality would depend on reference identity.")]
 public readonly union Validation<TSuccess, TFailure>(
     Success<TSuccess>,
     Failure<NonEmptyList<TFailure>>);

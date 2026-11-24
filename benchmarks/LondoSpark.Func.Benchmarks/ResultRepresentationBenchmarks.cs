@@ -3,6 +3,8 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using LondoSpark.Func;
 
+namespace LondoSpark.Func.Benchmarks;
+
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [CategoriesColumn]
@@ -104,8 +106,8 @@ public class ResultRepresentationBenchmarks
         LegacyBoxedUnionResult<int, string> boxedFailed = new(new Failure<string>("invalid"));
         Result<int, string> inlineFailed = new(new Failure<string>("invalid"));
         LegacyBoxedUnionResult<string?, string?> boxedSuccessNull =
-            new(new Success<string?>((string?)null));
-        Result<string?, string?> inlineSuccessNull = new(new Success<string?>((string?)null));
+            new(new Success<string?>(null));
+        Result<string?, string?> inlineSuccessNull = new(new Success<string?>(null));
 
         if (InlineSuccess is not Success<int> { Value: 41 })
             throw new InvalidOperationException("The inline union failed to read its success case.");

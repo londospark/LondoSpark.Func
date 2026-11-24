@@ -1,0 +1,12 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Curated analyzer set, enforced in builds and CI. The .editorconfig records the
+         rules that are deliberately disabled; dialling AnalysisLevel up to latest-all
+         stays warning-free too. -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

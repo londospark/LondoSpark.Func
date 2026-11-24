@@ -99,7 +99,7 @@ public sealed class ValidationTests
     {
         var selectReceivedNull = false;
         Validation<string?, string?> successNull =
-            Validation.Return<string?, string?>((string?)null);
+            Validation.Return<string?, string?>(null);
 
         var selected = successNull.Select(value =>
         {
@@ -115,9 +115,9 @@ public sealed class ValidationTests
     public async Task ValidationApplyAccumulatesNullableErrorsInOrder()
     {
         Validation<Func<int, int>, string?> functionErrors =
-            Validation.Failure<Func<int, int>, string?>((string?)null, "function-error");
+            Validation.Failure<Func<int, int>, string?>(null, "function-error");
         Validation<int, string?> valueErrors =
-            Validation.Failure<int, string?>((string?)null, "value-error");
+            Validation.Failure<int, string?>(null, "value-error");
 
         var combined = functionErrors.Apply(valueErrors);
         var selected = combined.Select(_ => 0);

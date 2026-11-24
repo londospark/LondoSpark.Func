@@ -3,6 +3,8 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
 using LondoSpark.Func;
 
+namespace LondoSpark.Func.Benchmarks;
+
 [MemoryDiagnoser]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
 [CategoriesColumn]
@@ -86,8 +88,8 @@ public class OptionRepresentationBenchmarks
     {
         LegacyBoxedUnionOption<int> boxedNone = new None();
         Option<int> inlineNone = new None();
-        LegacyBoxedUnionOption<string?> boxedSomeNull = new Some<string?>((string?)null);
-        Option<string?> inlineSomeNull = new Some<string?>((string?)null);
+        LegacyBoxedUnionOption<string?> boxedSomeNull = new Some<string?>(null);
+        Option<string?> inlineSomeNull = new Some<string?>(null);
 
         if (InlineSome is not Some<int> { Value: 41 })
             throw new InvalidOperationException("The inline union failed to read its Some case.");

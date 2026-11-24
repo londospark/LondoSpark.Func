@@ -1,0 +1,34 @@
+root = true
+
+[*.cs]
+# File-scoped namespaces are required style for this repository.
+csharp_style_namespace_declarations = file_scoped:warning
+# Prefer expression-bodied members whenever the body fits on one line.
+csharp_style_expression_bodied_constructors = when_on_single_line:warning
+csharp_style_expression_bodied_methods = when_on_single_line:warning
+csharp_style_expression_bodied_operators = when_on_single_line:warning
+csharp_style_expression_bodied_local_functions = when_on_single_line:warning
+csharp_style_expression_bodied_properties = true:warning
+csharp_style_expression_bodied_indexers = true:warning
+csharp_style_expression_bodied_accessors = true:warning
+csharp_style_expression_bodied_lambdas = true:warning
+# IDE0004: keep redundant casts out; the build enforces it.
+dotnet_diagnostic.IDE0004.severity = warning
+# CA1062: nullable reference annotations describe the contract, and the library
+# deliberately avoids defensive null checks (see README).
+dotnet_diagnostic.CA1062.severity = none
+# CA1716: 'Option' and 'Result' are the public API names; the conflict with a
+# reserved keyword in other languages is accepted for this domain vocabulary.
+dotnet_diagnostic.CA1716.severity = none
+
+# IDE0022: Use block body for method
+dotnet_diagnostic.IDE0022.severity = suggestion
+
+[tests/**/*.cs]
+# TUnit discovers public test types, and tests have no synchronization context.
+dotnet_diagnostic.CA1515.severity = none
+dotnet_diagnostic.CA2007.severity = none
+
+[benchmarks/**/*.cs]
+# BenchmarkDotNet runs [Benchmark] methods on an instance of the benchmark class.
+dotnet_diagnostic.CA1822.severity = none

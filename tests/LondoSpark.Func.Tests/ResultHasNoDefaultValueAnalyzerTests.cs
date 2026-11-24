@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -145,7 +146,7 @@ public sealed class ResultHasNoDefaultValueAnalyzerTests
             .ToArray();
 
         await Assert.That(matching.Length).IsEqualTo(1);
-        await Assert.That(matching[0].GetMessage()).Contains(expectedMessage);
+        await Assert.That(matching[0].GetMessage(CultureInfo.InvariantCulture)).Contains(expectedMessage);
         await Assert.That(matching[0].Severity).IsEqualTo(DiagnosticSeverity.Error);
     }
 
