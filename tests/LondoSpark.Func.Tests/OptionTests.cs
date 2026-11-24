@@ -122,6 +122,14 @@ public sealed class OptionTests
     }
 
     [Test]
+    public async Task OptionToStringRendersTheActiveCase()
+    {
+        await Assert.That(Option.Return(42).ToString()).IsEqualTo("Some(42)");
+        await Assert.That(Option.Empty<int>().ToString()).IsEqualTo("None");
+        await Assert.That(Option.Return<string?>(null).ToString()).IsEqualTo("Some()");
+    }
+
+    [Test]
     public async Task NoneValuesAreAlwaysEqual()
     {
         None first = new();

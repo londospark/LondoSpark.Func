@@ -109,6 +109,16 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
     /// <returns><see langword="true"/> when the results differ in case or payload.</returns>
     public static bool operator !=(Result<TSuccess, TFailure> left, Result<TSuccess, TFailure> right) =>
         !left.Equals(right);
+
+    /// <summary>Renders the active case so success and failure are visible in logs.</summary>
+    /// <returns><c>Success(value)</c>, <c>Failure(error)</c>, or <c>Result(default)</c> when there is no case.</returns>
+    public override string ToString() =>
+        _tag switch
+        {
+            SuccessTag => $"Success({_successValue.Value})",
+            FailureTag => $"Failure({_failureValue.Value})",
+            _ => "Result(default)"
+        };
 }
 
 /// <summary>Wraps a successful result value, including null.</summary>

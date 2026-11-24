@@ -90,6 +90,11 @@ public readonly struct Option<TSome> : IEquatable<Option<TSome>>
     /// <returns><see langword="true"/> when the options differ in case or payload.</returns>
     public static bool operator !=(Option<TSome> left, Option<TSome> right) =>
         !left.Equals(right);
+
+    /// <summary>Renders the active case, using <c>Some(</c> and <c>None</c> so absence is visible in logs.</summary>
+    /// <returns><c>Some(value)</c> for a present value, or <c>None</c>.</returns>
+    public override string ToString() =>
+        _tag == SomeTag ? $"Some({_someValue.Value})" : nameof(None);
 }
 
 /// <summary>Wraps a present option value, including null.</summary>

@@ -223,6 +223,14 @@ public sealed class ResultTests
     }
 
     [Test]
+    public async Task ResultToStringRendersTheActiveCase()
+    {
+        await Assert.That(Result.Return<int, string>(7).ToString()).IsEqualTo("Success(7)");
+        await Assert.That(Result.Failure<int, string>("invalid").ToString()).IsEqualTo("Failure(invalid)");
+        await Assert.That(default(Result<int, string>).ToString()).IsEqualTo("Result(default)");
+    }
+
+    [Test]
     public async Task ResultEqualityComparesCaseAndPayload()
     {
         Result<int, string> success = Result.Return<int, string>(3);
