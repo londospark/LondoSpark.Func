@@ -1,0 +1,9 @@
+<Project>
+
+  <!-- Shares the switch defined by the core package; a consumer can turn both off with
+       <LondoSparkFuncImplicitUsings>false</LondoSparkFuncImplicitUsings>. -->
+  <PropertyGroup Condition="'$(LondoSparkFuncImplicitUsings)' == ''">
+    <LondoSparkFuncImplicitUsings>true</LondoSparkFuncImplicitUsings>
+  </PropertyGroup>
+
+</Project>

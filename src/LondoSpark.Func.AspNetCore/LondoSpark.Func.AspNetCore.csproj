@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Version>0.2.0-prealpha.2</Version>
+    <PackageId>LondoSpark.Func.AspNetCore</PackageId>
+    <AssemblyName>LondoSpark.Func.AspNetCore</AssemblyName>
+    <RootNamespace>LondoSpark.Func.AspNetCore</RootNamespace>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Authors>LondoSpark</Authors>
+    <Description>Maps LondoSpark.Func option, result, and validation values to ASP.NET Core HTTP results.</Description>
+    <PackageTags>functional;option;result;validation;aspnetcore</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/londospark/LondoSpark.Func</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/londospark/LondoSpark.Func</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../LondoSpark.Func/LondoSpark.Func.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="buildTransitive/LondoSpark.Func.AspNetCore.props" Pack="true" PackagePath="buildTransitive/" />
+    <None Include="buildTransitive/LondoSpark.Func.AspNetCore.targets" Pack="true" PackagePath="buildTransitive/" />
+  </ItemGroup>
+
+</Project>

@@ -31,14 +31,18 @@ var outcome = args.FirstOrDefault().ToOption() switch
 };
 
 // ErrorResult focuses composition on the failure case without disturbing success.
-return outcome
+var report = outcome
     .AsErrorResult()
     .Select(error => $"ConsolePipeline: {error}")
-    .ToResult() switch
+    .ToResult();
+
+Console.WriteLine(report switch
 {
-    Success<string> success => Report(0, success.Value),
-    Failure<string> failure => Report(1, failure.Value)
-};
+    Success<string> success => success.Value,
+    Failure<string> failure => failure.Value
+});
+
+return report.ToExitCode();
 
 Result<string, string> Find(CustomerDirectory directory, string[] args) =>
     args.ElementAtOrDefault(1).ToOption() switch
@@ -61,17 +65,11 @@ static Result<string, string> Register(CustomerDirectory directory, CustomerRequ
             {
                 Success<Customer> { Value: var registered } =>
                     Result.Return<string, string>($"Registered customer {registered.Id}."),
-                Failure<string> { Value: var error } => Result.Failure<string, string>(error)
+                Failure<ValidationError> { Value: var error } => Result.Failure<string, string>(error.ToString())
             },
-        Failure<NonEmptyList<string>> errors =>
-            Result.Failure<string, string>(string.Join(" ", errors.Value))
+        Failure<NonEmptyList<ValidationError>> errors =>
+            Result.Failure<string, string>(errors.Value.ToSeparatedString(" "))
     };
 
 static string Describe(Customer customer) =>
     $"#{customer.Id} {customer.Name} <{customer.Email}>, age {customer.Age}";
-
-static int Report(int exitCode, string message)
-{
-    Console.WriteLine(message);
-    return exitCode;
-}

@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../DomainModeling/DomainModeling.csproj" />
     <ProjectReference Include="../../src/LondoSpark.Func/LondoSpark.Func.csproj" />
+    <ProjectReference Include="../../src/LondoSpark.Func.AspNetCore/LondoSpark.Func.AspNetCore.csproj" />
   </ItemGroup>
 
 </Project>

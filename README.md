@@ -12,6 +12,8 @@ The project is early in development; its API and package layout may change.
 - `src/LondoSpark.Func.Analyzers` — Roslyn analyzers, bundled into the core package.
 - `src/LondoSpark.Func.Json` — `System.Text.Json` converters for `Option<T>` and
   `Result<TSuccess, TFailure>`.
+- `src/LondoSpark.Func.AspNetCore` — maps options, results, and validations to HTTP
+  results and field-keyed validation problems.
 - `src/LondoSpark.Func.FSharp` — typed conversions to and from F# `option` and
   `Result`, including values whose payload types are nullable.
 - `tests/LondoSpark.Func.Tests` — TUnit tests and FsCheck monad-law properties.
@@ -81,6 +83,25 @@ result is `{"success": value}` or `{"failure": error}`. The object wrapper keeps
 var options = new JsonSerializerOptions { WriteIndented = true };
 options.AddLondoSparkFuncConverters();
 ```
+
+`LondoSpark.Func.AspNetCore` maps the same values to endpoints. `ValidationError`
+carries a field name and a message, so a validation problem is grouped the way a
+form expects:
+
+```csharp
+app.MapGet("/customers/{id:int}", (int id) => directory.Find(id).ToOkOrNotFound());
+
+app.MapPost("/customers", (CustomerRequest request) =>
+    CustomerValidation.Validate(request).ToHttpResult(
+        validated => directory.Register(validated).ToHttpResult(
+            customer => TypedResults.Created($"/customers/{customer.Id}", customer),
+            error => TypedResults.Conflict(error.Message))));
+```
+
+A result maps with `ToOkOrProblem(status, error => error.Message)`, and
+`Validation<TSuccess, TValidationError>` accepts selectors for any custom error
+type. `NonEmptyList<T>.ToSeparatedString` joins messages, and
+`Result.ToExitCode()` maps a CLI result to a process exit code.
 
 The local BenchmarkDotNet project is deliberately outside the solution and is
 not run by CI. It uses BenchmarkDotNet 0.16.0-preview.2 for .NET 11 support.

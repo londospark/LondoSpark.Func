@@ -1,0 +1,7 @@
+<Project>
+
+  <ItemGroup Condition="'$(LondoSparkFuncImplicitUsings)' == 'true' and '$(Language)' == 'C#'">
+    <Using Include="LondoSpark.Func.AspNetCore" />
+  </ItemGroup>
+
+</Project>

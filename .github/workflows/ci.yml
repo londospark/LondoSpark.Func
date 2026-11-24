@@ -37,6 +37,7 @@ jobs:
           dotnet pack src/LondoSpark.Func/LondoSpark.Func.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
           dotnet pack src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
           dotnet pack src/LondoSpark.Func.Json/LondoSpark.Func.Json.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
+          dotnet pack src/LondoSpark.Func.AspNetCore/LondoSpark.Func.AspNetCore.csproj --configuration Release --no-build --no-restore --output "${{ runner.temp }}/packages"
 
       - name: Upload NuGet packages
         uses: actions/upload-artifact@v7.0.2

@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="TUnit" />
     <PackageReference Include="TUnit.FsCheck" />
@@ -21,6 +22,7 @@
     <ProjectReference Include="../../src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj" />
     <ProjectReference Include="../../src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
     <ProjectReference Include="../../src/LondoSpark.Func.Json/LondoSpark.Func.Json.csproj" />
+    <ProjectReference Include="../../src/LondoSpark.Func.AspNetCore/LondoSpark.Func.AspNetCore.csproj" />
   </ItemGroup>
 
 </Project>

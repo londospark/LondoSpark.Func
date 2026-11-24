@@ -29,9 +29,10 @@ The dependency-light core:
 
 The core should not depend on FSharp.Core or Roslyn.
 
-`Validation<TSuccess, TFailure>` is an applicative for independent checks. It
-accumulates failures in an ordered, non-empty list and intentionally does not
-expose `Bind`.
+`Validation<TSuccess, TValidationError>` is an applicative for independent checks.
+It accumulates failures in an ordered, non-empty list and intentionally does not
+expose `Bind`. `ValidationError` is the ready-made error type: it carries a field
+name and a message, so failures can be grouped per input at a boundary.
 
 ### `LondoSpark.Func.Generators`
 
@@ -55,6 +56,14 @@ without a per-file using. The default is controlled by the
 project file, following the same pattern as `TUnit.Core`. Property defaults live in
 the `.props` file and the `Using` item in the `.targets` file, because item
 conditions are evaluated after every property.
+
+### `LondoSpark.Func.AspNetCore`
+
+Maps unions to HTTP results: `Option` to `200`/`404`, `Result` to a chosen status
+with a problem detail, and `Validation` to a field-keyed `400` problem. The mapping
+is generic over the error type through selectors, with overloads for
+`ValidationError` that need none. Failure paths allocate the problem payload only;
+success paths just wrap the value.
 
 ### `LondoSpark.Func.Json`
 
