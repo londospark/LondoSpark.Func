@@ -11,12 +11,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="TUnit" />
     <PackageReference Include="TUnit.FsCheck" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/LondoSpark.Func/LondoSpark.Func.csproj" />
+    <ProjectReference Include="../../src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj" />
     <ProjectReference Include="../../src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
   </ItemGroup>
 

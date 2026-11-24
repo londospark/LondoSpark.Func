@@ -1,0 +1,12 @@
+<Project>
+
+  <!--
+    Property defaults live in .props so a consumer can override them from the project body;
+    the Using item stays in .targets because item conditions are evaluated after every property.
+    This mirrors the TUnit.Core buildTransitive assets.
+  -->
+  <PropertyGroup Condition="'$(LondoSparkFuncImplicitUsings)' == ''">
+    <LondoSparkFuncImplicitUsings>true</LondoSparkFuncImplicitUsings>
+  </PropertyGroup>
+
+</Project>

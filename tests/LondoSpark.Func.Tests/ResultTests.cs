@@ -205,6 +205,23 @@ public sealed class ResultTests
     }
 
     [Test]
+    public async Task ResultDefaultContainsNoCase()
+    {
+        Result<int, string> defaultResult = default;
+        Result<int, string> successful = Result.Return<int, string>(1);
+        Result<int, string> failed = Result.Failure<int, string>("invalid");
+
+        await Assert.That(defaultResult.HasValue).IsFalse();
+        await Assert.That(defaultResult is Success<int>).IsFalse();
+        await Assert.That(defaultResult is Failure<string>).IsFalse();
+        await Assert.That(successful.HasValue).IsTrue();
+        await Assert.That(failed.HasValue).IsTrue();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => _ = defaultResult.Value);
+        await Assert.That(exception.Message).Contains("no case");
+    }
+
+    [Test]
     public async Task ResultSelectMapsNullSuccessAndPreservesNullFailure()
     {
         var selectCalledForSuccess = false;

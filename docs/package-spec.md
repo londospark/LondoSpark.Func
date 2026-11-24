@@ -39,11 +39,30 @@ An optional Roslyn incremental source generator that emits repetitive, type-spec
 LINQ operators from explicit monad metadata. Generated code is compile-time code; it
 must not use runtime reflection or add runtime dispatch.
 
+### `LondoSpark.Func.Analyzers`
+
+A Roslyn analyzer bundled into the `LondoSpark.Func` package, not shipped separately,
+so C# consumers get it without an extra reference. It reports hand-written zero values
+of `Result<TSuccess, TFailure>` as an error (`LSF0001`), which the library never
+produces. `Option<TSome>` needs no rule because its zero value is `None`.
+
+### Implicit usings
+
+`LondoSpark.Func` also ships `buildTransitive` assets that add
+`<Using Include="LondoSpark.Func" />` to C# consumers, so the namespace is available
+without a per-file using. The default is controlled by the
+`LondoSparkFuncImplicitUsings` property and can be disabled from the consumer's
+project file, following the same pattern as `TUnit.Core`. Property defaults live in
+the `.props` file and the `Using` item in the `.targets` file, because item
+conditions are evaluated after every property.
+
 ### `LondoSpark.Func.FSharp`
 
 An optional interop package referencing FSharp.Core. It supplies explicit conversions
 between the core types and standard F# `option` and `Result` types. Users who do not
-use F# should not acquire this dependency.
+use F# should not acquire this dependency. Because it depends on the whole of
+`LondoSpark.Func`, C# projects referencing only the F# package still receive the
+`LSF0001` analyzer and the global using.
 
 ### ASP.NET Core and Blazor integrations
 
@@ -70,7 +89,8 @@ When `TSome` is nullable, `Some(null)` remains distinct from `None`.
 data to the present case when it has a value and to `None` otherwise.
 
 Binding a present value invokes the binder. Binding `None` returns `None` without
-invoking it. Mapping follows the same case behavior.
+invoking it. Mapping follows the same case behavior. The zero value of `Option<TSome>`
+is `None`, so every option contains a case.
 
 ### Result
 
@@ -80,6 +100,10 @@ payloads retain their case identity through the explicit `Success<T>` and
 Success-side `Bind` invokes the binder only for success and preserves failures.
 `MapError` changes a failure value while preserving success. `BindError` invokes its
 binder only for failure and preserves success.
+
+No case can represent zero-initialisation, so `default` and `new()` produce a result
+with no case: `HasValue` is `false`, case patterns do not match, and `Value` throws.
+The `LSF0001` analyzer reports the explicit forms at compile time.
 
 `ErrorResult<TSuccess, TFailure>` is an optional error-focused view over `Result`, not
 a second union. It supports LINQ query syntax that binds on failures and converts back

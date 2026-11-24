@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/LondoSpark.Func/LondoSpark.Func.csproj" />
+    <Project Path="src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj" />
     <Project Path="src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
   </Folder>
   <Folder Name="/tests/">

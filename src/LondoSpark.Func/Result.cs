@@ -1,11 +1,74 @@
 using System;
+using System.Runtime.CompilerServices;
 
 namespace LondoSpark.Func;
 
 /// <summary>Keeps success or failure in an explicit case so nullable payloads retain their case identity.</summary>
 /// <typeparam name="TSuccess">The type of the success value.</typeparam>
 /// <typeparam name="TFailure">The type of the failure value.</typeparam>
-public readonly union Result<TSuccess, TFailure>(Success<TSuccess>, Failure<TFailure>);
+/// <remarks>
+/// Every value created by <c>Result.Return</c> or <c>Result.Failure</c> contains a case. Because this is a struct,
+/// <see langword="default"/> and <c>new()</c> produce a zero value that contains no case: <see cref="HasValue"/> is
+/// <see langword="false"/>, the case patterns do not match, and <see cref="Value"/> throws.
+/// </remarks>
+[Union]
+public readonly struct Result<TSuccess, TFailure>
+{
+    private const byte SuccessTag = 1;
+    private const byte FailureTag = 2;
+
+    private readonly Success<TSuccess> _successValue;
+    private readonly Failure<TFailure> _failureValue;
+    private readonly byte _tag;
+
+    /// <summary>Creates the successful case containing <paramref name="value"/>.</summary>
+    /// <param name="value">The success value to store.</param>
+    public Result(Success<TSuccess> value)
+    {
+        _successValue = value;
+        _tag = SuccessTag;
+    }
+
+    /// <summary>Creates the failed case containing <paramref name="value"/>.</summary>
+    /// <param name="value">The failure value to store.</param>
+    public Result(Failure<TFailure> value)
+    {
+        _failureValue = value;
+        _tag = FailureTag;
+    }
+
+    /// <summary>Gets the boxed active case.</summary>
+    /// <exception cref="InvalidOperationException">This result is <see langword="default"/> or <c>new()</c> and contains no case.</exception>
+    public object Value =>
+        _tag switch
+        {
+            SuccessTag => _successValue,
+            FailureTag => _failureValue,
+            _ => throw new InvalidOperationException(
+                "A default result contains no case. Construct results with Result.Return or Result.Failure.")
+        };
+
+    /// <summary>Gets whether this result contains a case; <see langword="false"/> only for <see langword="default"/>.</summary>
+    public bool HasValue => _tag is SuccessTag or FailureTag;
+
+    /// <summary>Gets the successful case when this result contains a <see cref="Success{TSuccess}"/>.</summary>
+    /// <param name="value">Receives the successful case, or its default value when this result does not contain it.</param>
+    /// <returns><see langword="true"/> when this result contains a successful case.</returns>
+    public bool TryGetValue(out Success<TSuccess> value)
+    {
+        value = _successValue;
+        return _tag == SuccessTag;
+    }
+
+    /// <summary>Gets the failed case when this result contains a <see cref="Failure{TFailure}"/>.</summary>
+    /// <param name="value">Receives the failed case, or its default value when this result does not contain it.</param>
+    /// <returns><see langword="true"/> when this result contains a failed case.</returns>
+    public bool TryGetValue(out Failure<TFailure> value)
+    {
+        value = _failureValue;
+        return _tag == FailureTag;
+    }
+}
 
 /// <summary>Wraps a successful result value, including null.</summary>
 /// <typeparam name="TSuccess">The type of the successful value.</typeparam>

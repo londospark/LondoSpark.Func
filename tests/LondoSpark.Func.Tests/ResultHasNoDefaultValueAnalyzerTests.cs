@@ -1,0 +1,172 @@
+using System;
+using System.Collections.Immutable;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+
+using LondoSpark.Func.Analyzers;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using TUnit.Assertions;
+using TUnit.Assertions.Extensions;
+using TUnit.Core;
+
+namespace LondoSpark.Func.Tests;
+
+public sealed class ResultHasNoDefaultValueAnalyzerTests
+{
+    private const string AnalyzerDiagnosticId = ResultHasNoDefaultValueAnalyzer.DiagnosticId;
+
+    [Test]
+    public async Task AnalyzerReportsDefaultExpression()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Result<int, string> Value() => default(Result<int, string>);
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "no zero value");
+    }
+
+    [Test]
+    public async Task AnalyzerReportsTargetTypedDefaultLiteral()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static readonly Result<int, string> Field = default;
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "no zero value");
+    }
+
+    [Test]
+    public async Task AnalyzerReportsEmptyObjectCreation()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Result<int, string> Create() => new Result<int, string>();
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "no zero value");
+    }
+
+    [Test]
+    public async Task AnalyzerReportsTargetTypedObjectCreation()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Result<int, string> Create()
+                {
+                    Result<int, string> result = new();
+                    return result;
+                }
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "no zero value");
+    }
+
+    [Test]
+    public async Task AnalyzerReportsArrayCreation()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Result<int, string>[] Create() => new Result<int, string>[4];
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "no zero value");
+    }
+
+    [Test]
+    public async Task AnalyzerIgnoresConstructedResults()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Result<int, string> Successful() => Result.Return<int, string>(1);
+
+                public static Result<int, string> Failed() => Result.Failure<int, string>("invalid");
+
+                public static Result<int, string> Constructed() => new Result<int, string>(new Success<int>(1));
+            }
+            """);
+
+        await Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == AnalyzerDiagnosticId)).IsFalse();
+    }
+
+    [Test]
+    public async Task AnalyzerIgnoresDefaultOptions()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Option<int> Empty() => default;
+            }
+            """);
+
+        await Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == AnalyzerDiagnosticId)).IsFalse();
+    }
+
+    private static async Task AssertSingleDiagnostic(ImmutableArray<Diagnostic> diagnostics, string expectedMessage)
+    {
+        var matching = diagnostics
+            .Where(diagnostic => diagnostic.Id == AnalyzerDiagnosticId)
+            .ToArray();
+
+        await Assert.That(matching.Length).IsEqualTo(1);
+        await Assert.That(matching[0].GetMessage()).Contains(expectedMessage);
+        await Assert.That(matching[0].Severity).IsEqualTo(DiagnosticSeverity.Error);
+    }
+
+    private static async Task<ImmutableArray<Diagnostic>> AnalyzeAsync(string source)
+    {
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator)
+            .Append(typeof(Result<,>).Assembly.Location)
+            .Distinct(StringComparer.Ordinal)
+            .Select(static path => MetadataReference.CreateFromFile(path));
+
+        var compilation = CSharpCompilation.Create(
+            "AnalyzerTest",
+            [CSharpSyntaxTree.ParseText(source)],
+            references,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
+
+        return await compilation
+            .WithAnalyzers([new ResultHasNoDefaultValueAnalyzer()])
+            .GetAnalyzerDiagnosticsAsync();
+    }
+}

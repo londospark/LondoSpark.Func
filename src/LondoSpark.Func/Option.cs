@@ -1,15 +1,16 @@
 using System;
+using System.Runtime.CompilerServices;
 
 namespace LondoSpark.Func;
 
 /// <summary>Models a present value or explicit absence; a nullable payload remains present.</summary>
 /// <typeparam name="TSome">The type of the present value.</typeparam>
-[System.Runtime.CompilerServices.Union]
+/// <remarks>Every value, including <see langword="default"/> and <c>new()</c>, contains a case; the zero value is <see cref="None"/>.</remarks>
+[Union]
 public readonly struct Option<TSome>
 {
-    private const byte UninitializedTag = 0;
+    private const byte NoneTag = 0;
     private const byte SomeTag = 1;
-    private const byte NoneTag = 2;
 
     private readonly Some<TSome> _someValue;
     private readonly byte _tag;
@@ -22,25 +23,22 @@ public readonly struct Option<TSome>
         _tag = SomeTag;
     }
 
-    /// <summary>Creates the absent case.</summary>
+    /// <summary>Creates the absent case, which is also the value of <see langword="default"/>.</summary>
     /// <param name="value">The absent case value.</param>
+#pragma warning disable IDE0060 // Remove unused parameter - needed for union cases.
     public Option(None value)
+#pragma warning restore IDE0060 // Remove unused parameter
     {
         _someValue = default;
         _tag = NoneTag;
     }
 
-    /// <summary>Gets the boxed active case, or <see langword="null"/> for a default-initialized option.</summary>
-    public object? Value =>
-        _tag switch
-        {
-            SomeTag => _someValue,
-            NoneTag => new None(),
-            _ => null
-        };
+    /// <summary>Gets the boxed active case; never <see langword="null"/>.</summary>
+    public object Value =>
+        _tag == SomeTag ? (object)_someValue : new None();
 
-    /// <summary>Gets whether this option contains an initialized case.</summary>
-    public bool HasValue => _tag != UninitializedTag;
+    /// <summary>Gets a value indicating whether this option contains a case; always <see langword="true"/> because <see langword="default"/> is <see cref="None"/>.</summary>
+    public bool HasValue => true;
 
     /// <summary>Gets the present case when this option contains a <see cref="Some{TSome}"/>.</summary>
     /// <param name="value">Receives the present case, or its default value when this option does not contain it.</param>

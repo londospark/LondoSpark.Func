@@ -9,6 +9,7 @@ The project is early in development; its API and package layout may change.
 
 - `src/LondoSpark.Func` — core `Option<T>` and `Result<TSuccess, TFailure>` types,
   LINQ query operators, and conversions between `Option<T>` and `Result<T, Unit>`.
+- `src/LondoSpark.Func.Analyzers` — Roslyn analyzers, bundled into the core package.
 - `src/LondoSpark.Func.FSharp` — typed conversions to and from F# `option` and
   `Result`, including values whose payload types are nullable.
 - `tests/LondoSpark.Func.Tests` — TUnit tests and FsCheck monad-law properties.
@@ -42,10 +43,18 @@ a payload may be nullable. With nullable checking enabled, F# has corresponding
 nullness types, such as `string | null`, and warns when a nullable value is used
 where a non-null value is expected.
 
-`Option<T>` stores the present case inline and implements the C# union pattern,
-so `Some<T>` / `None` switch expressions retain exhaustive matching without
-boxing the case. Reading its object-typed `Value` protocol property directly
-boxes the case; ordinary case switches use typed accessors instead.
+`Option<T>` and `Result<TSuccess, TFailure>` store their active case inline and
+implement the C# union pattern, so `Some<T>` / `None` and `Success<T>` /
+`Failure<T>` switch expressions keep exhaustive matching without boxing the
+case. Reading the object-typed `Value` protocol property directly boxes the
+case; ordinary case switches use the typed accessors instead.
+
+A struct always has a zero value, so both types define what `default` means.
+`default(Option<T>)` is `None`, and every option contains a case. `Result` has
+no natural zero value, so `default(Result<TSuccess, TFailure>)` contains no
+case: `HasValue` is `false`, the case patterns do not match, and `Value` throws
+`InvalidOperationException` rather than reporting a fabricated success or
+failure.
 
 These annotations are compile-time guidance, not runtime validation. The core
 does not add defensive null checks: explicitly nullable values can be carried
@@ -58,15 +67,81 @@ payload.
 
 The local BenchmarkDotNet project is deliberately outside the solution and is
 not run by CI. It uses BenchmarkDotNet 0.16.0-preview.2 for .NET 11 support.
-Run a short comparison of the boxed and inline Option representations with:
+Run a short comparison of the boxed and inline Option and Result
+representations with:
 
 ```sh
-dotnet run --project benchmarks/LondoSpark.Func.Benchmarks/LondoSpark.Func.Benchmarks.csproj --configuration Release -- --filter '*OptionRepresentationBenchmarks*' --job Short
+dotnet run --project benchmarks/LondoSpark.Func.Benchmarks/LondoSpark.Func.Benchmarks.csproj --configuration Release -- --filter '*RepresentationBenchmarks*' --job Short
 ```
 
 Short-run timings are directional; the memory diagnoser is useful for checking
 whether case matching allocates. Use **Ctrl+F5** in VS Code to run without
 attaching the debugger, which can distort timing.
+
+## Analyzers
+
+The core package ships a Roslyn analyzer for C# consumers, so no extra reference
+is needed. `Result<TSuccess, TFailure>` is a struct, so `default`, `new()`, and
+empty arrays can produce a value with no case; `Option<TSome>` needs no rule
+because its zero value is `None`.
+
+| Rule | Default | Detects |
+| ---- | ------- | ------- |
+| `LSF0001` | Error | `default(Result<...>)`, `default` literals, `new Result<...>()`, and `new Result<...>[n]` |
+
+The library never creates such a value, so the rule only fires on hand-written
+zero values. Zeroing the analyzer cannot see — unassigned fields, array elements
+zeroed elsewhere, and generic `default` — is still rejected at runtime by
+`HasValue` and `Value`. If an error is too strict while migrating, lower it:
+
+```ini
+# .editorconfig
+[*.cs]
+dotnet_diagnostic.LSF0001.severity = warning
+```
+
+## Implicit usings
+
+The package adds a project-wide `global using LondoSpark.Func;` by default, so
+`Option<T>` and `Result<TSuccess, TFailure>` are available without a per-file
+`using`. It is a `Using` item shipped in the package's `buildTransitive` assets —
+the same mechanism TUnit uses for `TUnit.Core`.
+
+Because `Option`, `Result`, `Some`, `None`, `Success`, and `Failure` are common
+names, opt out when they collide with another library:
+
+```xml
+<PropertyGroup>
+  <LondoSparkFuncImplicitUsings>false</LondoSparkFuncImplicitUsings>
+</PropertyGroup>
+```
+
+Without the global using, add `using LondoSpark.Func;` per file, or add it
+yourself to a `GlobalUsings.cs`.
+
+Both packages deliver the analyzer and the global using. `LondoSpark.Func.FSharp`
+depends on the whole of `LondoSpark.Func`, so referencing the F# package alone is
+enough for C# code in the same project.
+
+## Pre-release risks
+
+This is a pre-release. The following behaviours are deliberate and can break a
+consumer on upgrade:
+
+- **`LSF0001` is an error by default.** Code that zero-initialises a
+  `Result<TSuccess, TFailure>` stops compiling. Lower it with
+  `dotnet_diagnostic.LSF0001.severity = warning` in `.editorconfig`.
+- **The global using is on by default.** Projects that also import another library
+  defining `Option`, `Result`, `Some`, `None`, `Success`, `Failure`, or `Validation`
+  can hit CS0104 ambiguity; set
+  `<LondoSparkFuncImplicitUsings>false</LondoSparkFuncImplicitUsings>`.
+- **The zero-value contract changed.** `default(Option<T>)` is now `None`;
+  `default(Result<TSuccess, TFailure>)` contains no case and throws.
+- **`net11.0` and C# 15 only.** Consumers must target .NET 11 with a compiler that
+  supports union types.
+- **No compatibility baseline.** Nothing has been published to NuGet.org, so package
+  validation and public-API baselines are not enforced yet; a pre-1.0 minor version
+  may contain breaking changes.
 
 ## Using the library
 

@@ -91,14 +91,15 @@ public sealed class OptionTests
     }
 
     [Test]
-    public async Task OptionDefaultRemainsDistinctFromExplicitNone()
+    public async Task OptionDefaultIsNone()
     {
         Option<int> defaultOption = default;
         Option<int> explicitNone = Option.Empty<int>();
 
-        await Assert.That(defaultOption.Value is null).IsTrue();
-        await Assert.That(defaultOption is None).IsFalse();
-        await Assert.That(defaultOption.Equals(explicitNone)).IsFalse();
+        await Assert.That(defaultOption.HasValue).IsTrue();
+        await Assert.That(defaultOption.Value is None).IsTrue();
+        await Assert.That(defaultOption is None).IsTrue();
+        await Assert.That(defaultOption).IsEqualTo(explicitNone);
     }
 
     [Test]
