@@ -21,8 +21,11 @@ general-purpose functional programming ecosystem.
 
 The dependency-light core:
 
-- `Option<TSome>` with `Some<TSome>` and `None` cases.
-- `Result<TSuccess, TFailure>` with `Success<TSuccess>` and `Failure<TFailure>` cases.
+- `Option<TSome>` with nested `Option<TSome>.Some` and shared `None` cases.
+- `Result<TSuccess, TFailure>` with nested `Success` and `Failure` cases.
+- `Validation<TSuccess, TValidationError>` with nested `Success` and `Failure` cases.
+- Analyzers and code fixes that bring a closed union's cases into scope with
+  `using static`, so switch arms name cases without type arguments.
 - `Return`, `Bind`, and mapping operations.
 - `MapError` and `BindError` for failure-side transformations.
 - `ToOption` conversions from nullable references and nullable value types.
@@ -106,7 +109,8 @@ and name each after the project it tests, followed by `.Tests` (for example,
 
 `Option<TSome>` represents either a present `TSome` or the payload-free `None` case.
 When `TSome` is nullable, `Some(null)` remains distinct from `None`.
-`Option.Return(value)` constructs the present case. `ToOption` maps nullable boundary
+`Option.Return(value)` and `Option.Some(value)` construct the present case;
+`Option.Empty<T>()` and `Option.None<T>()` construct the absent one. `ToOption` maps nullable boundary
 data to the present case when it has a value and to `None` otherwise.
 
 Binding a present value invokes the binder. Binding `None` returns `None` without
@@ -116,8 +120,8 @@ is `None`, so every option contains a case.
 ### Result
 
 `Result<TSuccess, TFailure>` represents one success or failure value. Nullable
-payloads retain their case identity through the explicit `Success<T>` and
-`Failure<T>` wrappers.
+payloads retain their case identity through the nested `Success` and `Failure`
+cases, which stay distinct even when both payload types are the same.
 Success-side `Bind` invokes the binder only for success and preserves failures.
 `MapError` changes a failure value while preserving success. `BindError` invokes its
 binder only for failure and preserves success.

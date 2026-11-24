@@ -8,6 +8,7 @@
     <RootNamespace>LondoSpark.Func</RootNamespace>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
     <Authors>LondoSpark</Authors>
     <Description>Small functional primitives for explicit absence and expected failure in C#.</Description>
     <PackageTags>functional;option;result;fsharp</PackageTags>
@@ -24,6 +25,10 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />
+    <ProjectReference Include="../LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,7 +39,7 @@
   </ItemGroup>
 
   <Target Name="PackAnalyzer">
-    <MSBuild Projects="../LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj"
+    <MSBuild Projects="../LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj;../LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj"
              Targets="GetTargetPath"
              Properties="Configuration=$(Configuration)">
       <Output TaskParameter="TargetOutputs" ItemName="_AnalyzerAssembly" />

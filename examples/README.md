@@ -6,7 +6,7 @@ would. They build with the rest of the solution, so they cannot drift from the A
 | Example | Project type | Shows |
 | ------- | ------------ | ----- |
 | [`DomainModeling`](DomainModeling) | class library | `Validation` accumulating field-keyed errors, `ToResult` folding them into one domain failure, `Option` for lookup, `Result` for sequencing |
-| [`ConsolePipeline`](ConsolePipeline) | console app | argument parsing with `ToOption`, `Option`/`Result` composition, `ErrorResult` enrichment, `ToSeparatedString`, `ToExitCode` |
+| [`ConsolePipeline`](ConsolePipeline) | console app | argument parsing with `ToOption`, case switches through `using static` imports and an alias, `ErrorResult` enrichment, `ToSeparatedString`, `ToExitCode` |
 | [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | one `Validate(...).Bind(Register).ToHttpResult(...)` pipeline, `ToHttpResult()` for a plain map, and field-keyed `400` problems from `LondoSpark.Func.AspNetCore` |
 | [`JsonSerialization`](JsonSerialization) | console app | `LondoSpark.Func.Json` converters that round-trip `Option<T>` and `Result<TSuccess, TFailure>` |
 | [`FSharpPipeline`](FSharpPipeline) | F# console app | lossless F# `option`/`Result` round-trips through the core types |

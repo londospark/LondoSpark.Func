@@ -14,8 +14,8 @@ The project is early in development; its API and package layout may change.
   `Result<TSuccess, TFailure>`.
 - `src/LondoSpark.Func.AspNetCore` — maps options, results, and validations to HTTP
   results and field-keyed validation problems.
-- `src/LondoSpark.Func.FSharp` — typed conversions to and from F# `option` and
-  `Result`, including values whose payload types are nullable.
+- `src/LondoSpark.Func.FSharp` — typed conversions to and from F# `option`,
+  `voption`, and `Result`, including values whose payload types are nullable.
 - `tests/LondoSpark.Func.Tests` — TUnit tests and FsCheck monad-law properties.
 - `tests/LondoSpark.Func.FSharp.Compatibility` — an F# consumer smoke test for
   the C# interop package.
@@ -47,18 +47,80 @@ a payload may be nullable. With nullable checking enabled, F# has corresponding
 nullness types, such as `string | null`, and warns when a nullable value is used
 where a non-null value is expected.
 
-`Option<T>` and `Result<TSuccess, TFailure>` store their active case inline and
-implement the C# union pattern, so `Some<T>` / `None` and `Success<T>` /
-`Failure<T>` switch expressions keep exhaustive matching without boxing the
-case. Reading the object-typed `Value` protocol property directly boxes the
-case; ordinary case switches use the typed accessors instead.
+`Option<T>`, `Result<TSuccess, TFailure>`, and `Validation<TSuccess, TError>` store
+their active case inline and implement the C# union pattern, so switch expressions
+over their cases are exhaustive and do not box. Reading the object-typed `Value`
+protocol property directly boxes a present case (`None` uses one shared instance);
+ordinary case switches use the typed accessors instead. Composition (`Select`, `Bind`, `Apply`, equality, hashing) on the
+success path allocates nothing, and the test suite asserts that. `Result` stores both
+payloads inline, so it is as large as both plus a tag; keep failure payloads small or
+reference-typed on hot paths.
 
-A struct always has a zero value, so both types define what `default` means.
+### Matching cases
+
+Each union's cases are nested types: `Option<T>.Some`, `Result<TSuccess,
+TFailure>.Success` and `.Failure`, and `Validation<TSuccess, TError>.Success` and
+`.Failure`. `None` is shared by every option. C# cannot infer type arguments in a
+pattern, so import the closed union type once per file and the cases need none:
+
+```csharp
+using static LondoSpark.Func.Result<Shop.Customer, Shop.CustomerError>;
+
+var message = registration switch
+{
+    Success(var customer) => $"Registered {customer.Id}",
+    Failure(var error) => error.Describe()
+};
+
+Result<Customer, CustomerError> Register(NewCustomer candidate) =>
+    IsTaken(candidate.Email)
+        ? new Failure(new AlreadyRegistered(candidate.Email))
+        : new Success(Add(candidate));
+```
+
+The switch stays exhaustive with no `default` arm, and the cases convert
+implicitly, so `new Success(...)` returns as a `Result`. Type arguments in a
+`using static` directive are namespace-qualified, because one using directive
+cannot see another's imports.
+
+When a file matches several unions with the same case names, such as
+`Option<string>` and `Option<Customer>`, import one and alias the other:
+
+```csharp
+using static LondoSpark.Func.Option<string>;
+using FoundCustomer = LondoSpark.Func.Option<Shop.Customer>;
+
+FoundCustomer.Some(var customer) => ...
+```
+
+Generic code, where the type arguments are type parameters, names the union:
+`Result<T, string>.Success(var value)`.
+
+You rarely type the import yourself. When a case name is not in scope — you write
+`Success(var c)` in a switch over a `Result<Customer, CustomerError>`, or
+`return new Success(c);` from a method returning one — the IDE offers
+**Add `using static LondoSpark.Func.Result<Shop.Customer, Shop.CustomerError>;`**.
+If that import would clash with one already in the file, or the union is over type
+parameters, it offers to qualify the name in place instead. Cases already written
+in full, `Result<Customer, CustomerError>.Success(...)`, are reported as `LSF0002`
+suggestions whose fix adds the import and shortens every case of that union in the
+file.
+
+Two things to watch:
+
+- A member of your own type named `Success`, `Failure`, or `Some` hides the imported
+  case in expression positions such as `Failure => ...`. Rename the member, or write
+  `Failure(_)`.
+- In a conditional, `cond ? default : new Some(value)` makes `default` a
+  `default(Some)`, which is a present `Some(null)`, not `None`. Write `new None()`.
+
+A struct always has a zero value, so every union defines what `default` means.
 `default(Option<T>)` is `None`, and every option contains a case. `Result` has
 no natural zero value, so `default(Result<TSuccess, TFailure>)` contains no
 case: `HasValue` is `false`, the case patterns do not match, and `Value` throws
 `InvalidOperationException` rather than reporting a fabricated success or
-failure.
+failure. Every extension method throws the same exception for such a value.
+`Validation` and `ErrorResult` follow the same rule.
 
 These annotations are compile-time guidance, not runtime validation. The core
 does not add defensive null checks: explicitly nullable values can be carried
@@ -72,16 +134,28 @@ payload.
 `Option<TSome>` and `Result<TSuccess, TFailure>` compare structurally: values are
 equal when they hold the same case with equal payloads. They implement
 `IEquatable<T>` and expose `==` and `!=`. `ToString()` renders the active case
-(`Some(42)`, `None`, `Success(42)`, `Failure(error)`), so log output is readable.
+(`Some(42)`, `Some(null)`, `None`, `Success(42)`, `Failure(error)`), so log output is
+readable. `Validation` equality compares a failure's error list by reference, because
+`NonEmptyList<T>` does not define structural equality.
 
 `LondoSpark.Func.Json` supplies the converters when these values cross a JSON
 boundary: an option is `null` for `None` or `{"some": value}` for `Some`, and a
 result is `{"success": value}` or `{"failure": error}`. The object wrapper keeps
-`Some(null)` distinct from `None`.
+`Some(null)` distinct from `None`. The wrapper's property names follow the
+configured `PropertyNamingPolicy` and `PropertyNameCaseInsensitive`, and the
+payload's type metadata is resolved once per configuration.
 
 ```csharp
 var options = new JsonSerializerOptions { WriteIndented = true };
 options.AddLondoSparkFuncConverters();
+```
+
+`AddLondoSparkFuncConverters` closes converters over runtime types, so it is marked
+`RequiresDynamicCode`. Native AOT and trimmed applications register each closed type
+instead:
+
+```csharp
+options.AddOptionConverter<Customer>().AddResultConverter<Customer, string>();
 ```
 
 `LondoSpark.Func.AspNetCore` maps the same values to endpoints. `ValidationError`
@@ -96,7 +170,7 @@ app.MapPost("/customers", (CustomerRequest request) =>
         .Bind(directory.Register)
         .ToHttpResult(
             customer => TypedResults.Created($"/customers/{customer.Id}", customer),
-            error => error switch
+            IResult (error) => error switch
             {
                 InvalidRequest invalid => invalid.Errors.ToValidationProblem(),
                 AlreadyRegistered taken => TypedResults.Problem(
@@ -115,7 +189,10 @@ types to spell out.
 validation is `200` or a field-keyed `400`. Any validation error type works by
 projecting it onto `ValidationError`; `Validation<TSuccess, ValidationError>` needs
 no projection, and `NonEmptyList<ValidationError>.ToValidationProblem()` builds the
-`400` payload for a case handled on its own.
+`400` payload for a case handled on its own. Every overload returns a typed
+`Results<TSuccess, TFailure>`, so OpenAPI sees both responses. When a callback's
+branches return different result types, as in the failure switch above, give the
+lambda an explicit `IResult` return type.
 `NonEmptyList<T>.ToSeparatedString` joins messages, and `Result.ToExitCode()` maps a
 CLI result to a process exit code.
 
@@ -142,19 +219,28 @@ themselves.
 
 ## Analyzers
 
-The core package ships a Roslyn analyzer for C# consumers, so no extra reference
-is needed. `Result<TSuccess, TFailure>` is a struct, so `default`, `new()`, and
-empty arrays can produce a value with no case; `Option<TSome>` needs no rule
-because its zero value is `None`.
+The core package ships Roslyn analyzers and code fixes for C# consumers, so no
+extra reference is needed. `Result<TSuccess, TFailure>`, `Validation<TSuccess, TError>`, and
+`ErrorResult<TSuccess, TFailure>` are structs, so `default`, `new()`, and arrays
+created without an initializer can produce a value with no case; `Option<TSome>`
+needs no rule because its zero value is `None`.
 
 | Rule | Default | Detects |
 | ---- | ------- | ------- |
-| `LSF0001` | Error | `default(Result<...>)`, `default` literals, `new Result<...>()`, and `new Result<...>[n]` |
+| `LSF0001` | Error | `default(T)`, `default` literals, `new T()`, and `new T[n]` for those three types |
+| `LSF0002` | Info | a case spelled through its closed union, such as `Result<A, B>.Success`, that a `using static` import would shorten; the fix adds the import and shortens the file |
 
-The library never creates such a value, so the rule only fires on hand-written
-zero values. Zeroing the analyzer cannot see — unassigned fields, array elements
-zeroed elsewhere, and generic `default` — is still rejected at runtime by
-`HasValue` and `Value`. If an error is too strict while migrating, lower it:
+The code fixes also respond to the compiler: a case name that is not in scope
+(CS0246, CS0103) or that resolves to another imported union's case (CS8121) offers
+the import, or the qualified name when an import would clash. See
+[Matching cases](#matching-cases).
+
+Arrays with an initializer (`new[] { first, second }`) and zero-length arrays are
+not reported, because they hold no zero values. The library never creates such a
+value, so the rule only fires on hand-written zero values. Zeroing the analyzer
+cannot see — unassigned fields, array elements zeroed elsewhere, and generic
+`default` — is still rejected at runtime: `HasValue` is `false`, and `Value` and
+every operation throw `InvalidOperationException`. If an error is too strict while migrating, lower it:
 
 ```ini
 # .editorconfig
@@ -183,8 +269,9 @@ yourself to a `GlobalUsings.cs`.
 
 Both packages deliver the analyzer and the global using. `LondoSpark.Func.FSharp`
 depends on the whole of `LondoSpark.Func`, so referencing the F# package alone is
-enough for C# code in the same project. `LondoSpark.Func.Json` adds
-`global using LondoSpark.Func.Json;` under the same switch.
+enough for C# code in the same project. `LondoSpark.Func.Json` and
+`LondoSpark.Func.FSharp` add `global using LondoSpark.Func.Json;` and
+`global using LondoSpark.Func.FSharp;` under the same switch.
 
 ## Pre-release risks
 
@@ -192,14 +279,16 @@ This is a pre-release. The following behaviours are deliberate and can break a
 consumer on upgrade:
 
 - **`LSF0001` is an error by default.** Code that zero-initialises a
-  `Result<TSuccess, TFailure>` stops compiling. Lower it with
+  `Result<TSuccess, TFailure>`, `Validation<TSuccess, TError>`, or
+  `ErrorResult<TSuccess, TFailure>` stops compiling. Lower it with
   `dotnet_diagnostic.LSF0001.severity = warning` in `.editorconfig`.
 - **The global using is on by default.** Projects that also import another library
   defining `Option`, `Result`, `Some`, `None`, `Success`, `Failure`, or `Validation`
   can hit CS0104 ambiguity; set
   `<LondoSparkFuncImplicitUsings>false</LondoSparkFuncImplicitUsings>`.
 - **The zero-value contract changed.** `default(Option<T>)` is now `None`;
-  `default(Result<TSuccess, TFailure>)` contains no case and throws.
+  `default(Result<TSuccess, TFailure>)` contains no case, so `Value` and every
+  operation throw `InvalidOperationException`.
 - **`net11.0` and C# 15 only.** Consumers must target .NET 11 with a compiler that
   supports union types.
 - **No compatibility baseline.** Nothing has been published to NuGet.org, so package
@@ -305,6 +394,7 @@ domain. Map each domain failure to an HTTP response at the endpoint boundary:
 using LondoSpark.Func;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using static LondoSpark.Func.Result<Product, ProductNotFound>;
 
 var app = WebApplication.CreateBuilder(args).Build();
 app.MapGet("/products/{id:int}", (int id) => ToHttpResult(FindProduct(id)));
@@ -312,15 +402,15 @@ app.Run();
 
 static Result<Product, ProductNotFound> FindProduct(int id) =>
     id == 42
-        ? Result.Return<Product, ProductNotFound>(new Product(id, "Answer"))
-        : Result.Failure<Product, ProductNotFound>(new ProductNotFound());
+        ? new Success(new Product(id, "Answer"))
+        : new Failure(new ProductNotFound());
 
 static Results<Ok<Product>, NotFound> ToHttpResult(
     Result<Product, ProductNotFound> result) =>
     result switch
     {
-        Success<Product> success => TypedResults.Ok(success.Value),
-        Failure<ProductNotFound> => TypedResults.NotFound()
+        Success(var product) => TypedResults.Ok(product),
+        Failure => TypedResults.NotFound()
     };
 
 public sealed record Product(int Id, string Name);
@@ -342,6 +432,8 @@ Components can keep loading, success, and expected failure explicit using
 ```razor
 @page "/products/{ProductId:int}"
 @using LondoSpark.Func
+@using static LondoSpark.Func.Option<LondoSpark.Func.Result<Shop.Product, Shop.ProductNotFound>>
+@using static LondoSpark.Func.Result<Shop.Product, Shop.ProductNotFound>
 @inject ProductService Products
 
 <p role="status">@ProductStatus</p>
@@ -354,15 +446,12 @@ Components can keep loading, success, and expected failure explicit using
     private string ProductStatus => _productResult switch
     {
         None => "Loading product...",
-        Some<Result<Product, ProductNotFound>> some => some.Value switch
-        {
-            Success<Product> success => $"Product: {success.Value.Name}",
-            Failure<ProductNotFound> => "Product not found."
-        }
+        Some(Success(var product)) => $"Product: {product.Name}",
+        Some(Failure) => "Product not found."
     };
 
     protected override async Task OnParametersSetAsync() =>
-        _productResult = await Products.FindAsync(ProductId);
+        _productResult = new Some(await Products.FindAsync(ProductId));
 }
 ```
 

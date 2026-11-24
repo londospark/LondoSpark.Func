@@ -2,10 +2,10 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-using LondoSpark.Func;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
+using static LondoSpark.Func.Option<int>;
 
 namespace LondoSpark.Func.Tests;
 
@@ -14,23 +14,23 @@ public sealed class OptionTests
     [Test]
     public async Task OptionFunctorIdentityAndComposition()
     {
-        Option<int> source = Option.Return(7);
+        var source = Option.Return(7);
         var identity = source.Select(value => value);
         var composed = source.Select(value => value + 2).Select(value => value * 3);
         var separate = source.Select(value => (value + 2) * 3);
 
-        await Assert.That(identity is Some<int> { Value: 7 }).IsTrue();
-        await Assert.That(composed is Some<int> { Value: 27 }).IsTrue();
-        await Assert.That(separate is Some<int> { Value: 27 }).IsTrue();
+        await Assert.That(identity is Some(7)).IsTrue();
+        await Assert.That(composed is Some(27)).IsTrue();
+        await Assert.That(separate is Some(27)).IsTrue();
     }
 
     [Test]
     public async Task OptionApplyCombinesPresentValues()
     {
-        Option<Func<int, int>> addOne = Option.Return<Func<int, int>>(value => value + 1);
-        Option<int> value = Option.Return(41);
+        var addOne = Option.Return<Func<int, int>>(value => value + 1);
+        var value = Option.Return(41);
 
-        await Assert.That(addOne.Apply(value) is Some<int> { Value: 42 }).IsTrue();
+        await Assert.That(addOne.Apply(value) is Some(42)).IsTrue();
     }
 
     [Test]
@@ -38,15 +38,15 @@ public sealed class OptionTests
     {
         var functionCalled = false;
 
-        Option<Func<int, int>> absentFunction = Option.Empty<Func<int, int>>();
-        Option<int> presentValue = Option.Return(10);
-        Option<Func<int, int>> presentFunction =
+        var absentFunction = Option.Empty<Func<int, int>>();
+        var presentValue = Option.Return(10);
+        var presentFunction =
             Option.Return<Func<int, int>>(value =>
             {
                 functionCalled = true;
                 return value + 1;
             });
-        Option<int> absentValue = Option.Empty<int>();
+        var absentValue = Option.Empty<int>();
 
         var absentFunctionResult = absentFunction.Apply(presentValue);
         var absentValueResult = presentFunction.Apply(absentValue);
@@ -61,17 +61,17 @@ public sealed class OptionTests
     [Test]
     public async Task OptionBindComposesPresentValues()
     {
-        Option<int> option = Option.Return(21);
+        var option = Option.Return(21);
         var result = option.Bind(value => Option.Return(value * 2));
 
-        await Assert.That(result is Some<int> { Value: 42 }).IsTrue();
+        await Assert.That(result is Some(42)).IsTrue();
     }
 
     [Test]
     public async Task OptionBindSkipsBinderForNone()
     {
         var binderCalled = false;
-        Option<int> option = Option.Empty<int>();
+        var option = Option.Empty<int>();
         var result = option.Bind(value =>
         {
             binderCalled = true;
@@ -85,7 +85,7 @@ public sealed class OptionTests
     [Test]
     public async Task OptionEmptyEqualsExplicitNoneCase()
     {
-        Option<int> empty = Option.Empty<int>();
+        var empty = Option.Empty<int>();
         Option<int> explicitNone = new None();
 
         await Assert.That(empty).IsEqualTo(explicitNone);
@@ -95,7 +95,7 @@ public sealed class OptionTests
     public async Task OptionDefaultIsNone()
     {
         Option<int> defaultOption = default;
-        Option<int> explicitNone = Option.Empty<int>();
+        var explicitNone = Option.Empty<int>();
 
         await Assert.That(defaultOption.HasValue).IsTrue();
         await Assert.That(defaultOption.Value is None).IsTrue();
@@ -106,11 +106,11 @@ public sealed class OptionTests
     [Test]
     public async Task OptionEqualityComparesCaseAndPayload()
     {
-        Option<int> some = Option.Return(3);
-        Option<int> sameSome = new Some<int>(3);
-        Option<int> otherSome = Option.Return(4);
-        Option<string?> someNull = Option.Return<string?>(null);
-        Option<string?> noneNull = Option.Empty<string?>();
+        var some = Option.Return(3);
+        Option<int> sameSome = new Some(3);
+        var otherSome = Option.Return(4);
+        var someNull = Option.Return<string?>(null);
+        var noneNull = Option.Empty<string?>();
 
         await Assert.That(some).IsEqualTo(sameSome);
         await Assert.That(some == sameSome).IsTrue();
@@ -126,7 +126,7 @@ public sealed class OptionTests
     {
         await Assert.That(Option.Return(42).ToString()).IsEqualTo("Some(42)");
         await Assert.That(Option.Empty<int>().ToString()).IsEqualTo("None");
-        await Assert.That(Option.Return<string?>(null).ToString()).IsEqualTo("Some()");
+        await Assert.That(Option.Return<string?>(null).ToString()).IsEqualTo("Some(null)");
     }
 
     [Test]
@@ -134,7 +134,7 @@ public sealed class OptionTests
     {
         None first = new();
         None second = default;
-        None third = new None();
+        var third = new None();
 
         await Assert.That(first).IsEqualTo(second);
         await Assert.That(first).IsEqualTo(third);
@@ -148,11 +148,11 @@ public sealed class OptionTests
     public async Task OptionEveryNoneValueIsEqualAndHashesAlike()
     {
         Option<int> fromDefault = default;
-        Option<int> fromEmpty = Option.Empty<int>();
-        Option<int> fromNoneCase = new Option<int>(new None());
+        var fromEmpty = Option.Empty<int>();
+        var fromNoneCase = new Option<int>(new None());
         Option<int> fromParameterlessNew = new();
         Option<string?> fromDefaultNullable = default;
-        Option<string?> fromEmptyNullable = Option.Empty<string?>();
+        var fromEmptyNullable = Option.Empty<string?>();
 
         await Assert.That(fromDefault).IsEqualTo(fromEmpty);
         await Assert.That(fromEmpty).IsEqualTo(fromNoneCase);
@@ -168,10 +168,10 @@ public sealed class OptionTests
     [Test]
     public async Task OptionConvertsNullAndSupportsLinq()
     {
-        Option<string> some = "value".ToOption();
-        Option<string> none = ((string?)null).ToOption();
-        Option<int> someNumber = OptionExtensions.ToOption<int>(5);
-        Option<int> noNumber = ((int?)null).ToOption();
+        var some = "value".ToOption();
+        var none = ((string?)null).ToOption();
+        var someNumber = OptionExtensions.ToOption<int>(5);
+        var noNumber = ((int?)null).ToOption();
 
         var result = from first in some
                      from second in $"{first}-next".ToOption()
@@ -181,10 +181,10 @@ public sealed class OptionTests
                              from second in $"{first}-next".ToOption()
                              select second;
 
-        await Assert.That(result is Some<string> { Value: "value:value-next" }).IsTrue();
+        await Assert.That(result is Option<string>.Some("value:value-next")).IsTrue();
         await Assert.That(none is None).IsTrue();
         await Assert.That(shortCircuited is None).IsTrue();
-        await Assert.That(someNumber is Some<int> { Value: 5 }).IsTrue();
+        await Assert.That(someNumber is Some(5)).IsTrue();
         await Assert.That(noNumber is None).IsTrue();
     }
 
@@ -192,8 +192,8 @@ public sealed class OptionTests
     public async Task OptionQuerySkipsProjectorWhenSecondComputationIsNone()
     {
         var projectorCalled = false;
-        Option<int> source = Option.Return(1);
-        Option<int> absent = Option.Empty<int>();
+        var source = Option.Return(1);
+        var absent = Option.Empty<int>();
 
         var result = source.SelectMany(
             _ => absent,
@@ -210,36 +210,36 @@ public sealed class OptionTests
     [Test]
     public async Task OptionSomeNullRemainsDistinctFromNone()
     {
-        Option<string?> someNull = Option.Return<string?>(null);
-        Option<string?> none = Option.Empty<string?>();
+        var someNull = Option.Return<string?>(null);
+        var none = Option.Empty<string?>();
 
         var observedSome = someNull.Select(value => value is null ? "some-null" : "some-value");
         var observedNone = none.Select(_ => "should-not-be-produced");
 
-        await Assert.That(observedSome is Some<string> { Value: "some-null" }).IsTrue();
+        await Assert.That(observedSome is Option<string>.Some("some-null")).IsTrue();
         await Assert.That(observedNone is None).IsTrue();
     }
 
     [Test]
     public async Task OptionSelectPreservesNullPayloadsAndNullResults()
     {
-        Option<string?> someNull = Option.Return<string?>(null);
+        var someNull = Option.Return<string?>(null);
 
         var mappedNullPayload = someNull.Select(value =>
             value is null ? "mapped-null-payload" : "unexpected-value");
-        Option<string?> nullResult = someNull.Select(_ => (string?)null);
+        var nullResult = someNull.Select(_ => (string?)null);
         var observedNullResult = nullResult.Select(value =>
             value is null ? "still-some-null" : "unexpected-value");
 
-        await Assert.That(mappedNullPayload is Some<string> { Value: "mapped-null-payload" }).IsTrue();
-        await Assert.That(observedNullResult is Some<string> { Value: "still-some-null" }).IsTrue();
+        await Assert.That(mappedNullPayload is Option<string>.Some("mapped-null-payload")).IsTrue();
+        await Assert.That(observedNullResult is Option<string>.Some("still-some-null")).IsTrue();
     }
 
     [Test]
     public async Task OptionBindReceivesNullAndCanReturnPresentNull()
     {
         var binderReceivedNull = false;
-        Option<string?> someNull = Option.Return<string?>(null);
+        var someNull = Option.Return<string?>(null);
 
         var bound = someNull.Bind(value =>
         {
@@ -250,7 +250,7 @@ public sealed class OptionTests
             value is null ? "bound-some-null" : "unexpected-value");
 
         var noneBinderCalled = false;
-        Option<string?> none = Option.Empty<string?>();
+        var none = Option.Empty<string?>();
         var boundNone = none.Bind(value =>
         {
             noneBinderCalled = true;
@@ -258,7 +258,7 @@ public sealed class OptionTests
         });
 
         await Assert.That(binderReceivedNull).IsTrue();
-        await Assert.That(observedBound is Some<string> { Value: "bound-some-null" }).IsTrue();
+        await Assert.That(observedBound is Option<string>.Some("bound-some-null")).IsTrue();
         await Assert.That(boundNone is None).IsTrue();
         await Assert.That(noneBinderCalled).IsFalse();
     }
@@ -266,21 +266,21 @@ public sealed class OptionTests
     [Test]
     public async Task OptionApplyPassesPresentNullToFunction()
     {
-        Option<Func<string?, string>> function =
+        var function =
             Option.Return<Func<string?, string>>(value =>
                 value is null ? "received-null" : value);
-        Option<string?> someNull = Option.Return<string?>(null);
+        var someNull = Option.Return<string?>(null);
 
         var applied = function.Apply(someNull);
 
-        await Assert.That(applied is Some<string> { Value: "received-null" }).IsTrue();
+        await Assert.That(applied is Option<string>.Some("received-null")).IsTrue();
     }
 
     [Test]
     public async Task OptionSelectManyComposesNullPayloadsAndPreservesNone()
     {
-        Option<string?> someNull = Option.Return<string?>(null);
-        Option<string?> none = Option.Empty<string?>();
+        var someNull = Option.Return<string?>(null);
+        var none = Option.Empty<string?>();
 
         var composed = someNull.SelectMany(
             _ => Option.Return<string?>(null),
@@ -290,7 +290,7 @@ public sealed class OptionTests
             _ => Option.Return<string?>(null),
             (_, _) => "should-not-be-produced");
 
-        await Assert.That(composed is Some<string> { Value: "both-options-present-null" }).IsTrue();
+        await Assert.That(composed is Option<string>.Some("both-options-present-null")).IsTrue();
         await Assert.That(absent is None).IsTrue();
     }
 
@@ -303,7 +303,7 @@ public sealed class OptionTests
         // None can never carry and confirm the value is still just None.
         Option<int> noneWithStalePayload = default;
         Unsafe.As<Option<int>, OptionMirror<int>>(ref noneWithStalePayload) =
-            new(new Some<int>(42), 0);
+            new(new Some(42), 0);
 
         await Assert.That(noneWithStalePayload is None).IsTrue();
         await Assert.That(noneWithStalePayload).IsEqualTo(Option.Empty<int>());
@@ -313,13 +313,13 @@ public sealed class OptionTests
 
     private readonly struct OptionMirror<T>
     {
-        public OptionMirror(Some<T> someValue, byte tag)
+        public OptionMirror(Some someValue, byte tag)
         {
             SomeValue = someValue;
             Tag = tag;
         }
 
-        public Some<T> SomeValue { get; }
+        public Some SomeValue { get; }
 
         public byte Tag { get; }
     }

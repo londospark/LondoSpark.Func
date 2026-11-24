@@ -1,13 +1,19 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 using Examples.DomainModeling;
 using LondoSpark.Func;
+using static LondoSpark.Func.Option<string>;
+using static LondoSpark.Func.Result<string, string>;
+using FoundCustomer = LondoSpark.Func.Option<Examples.DomainModeling.Customer>;
 
 // A tiny CLI that keeps absence and expected failure explicit from argument parsing
 // through to the process exit code. The directory is seeded so every command has
 // something to work with.
+//
+// The static imports bring each union's cases into scope, so the switches below name
+// Some, Success, and Failure without type arguments and stay exhaustive. Option<string>
+// and Option<Customer> both have a Some case, so the second is reached through an alias.
 //
 //   dotnet run --project examples/ConsolePipeline -- find 1
 //   dotnet run --project examples/ConsolePipeline -- add Ada ada@example.com 36
@@ -19,15 +25,14 @@ _ = Register(directory, new CustomerRequest("Grace", "grace@example.com", "45"))
 
 var outcome = args.FirstOrDefault().ToOption() switch
 {
-    Some<string> { Value: "find" } => Find(directory, args),
-    Some<string> { Value: "add" } => Register(directory, new CustomerRequest(
+    Some("find") => Find(directory, args),
+    Some("add") => Register(directory, new CustomerRequest(
         args.ElementAtOrDefault(1),
         args.ElementAtOrDefault(2),
         args.ElementAtOrDefault(3))),
-    Some<string> { Value: "list" } => Result.Return<string, string>(
-        string.Join(Environment.NewLine, directory.All.Select(Describe))),
-    Some<string> { Value: var unknown } => Result.Failure<string, string>($"Unknown command '{unknown}'."),
-    None => Result.Failure<string, string>("Usage: find <id> | add <name> <email> <age> | list")
+    Some("list") => new Success(string.Join(Environment.NewLine, directory.All.Select(Describe))),
+    Some(var unknown) => new Failure($"Unknown command '{unknown}'."),
+    None => new Failure("Usage: find <id> | add <name> <email> <age> | list")
 };
 
 // ErrorResult focuses composition on the failure case without disturbing success.
@@ -38,23 +43,22 @@ var report = outcome
 
 Console.WriteLine(report switch
 {
-    Success<string> success => success.Value,
-    Failure<string> failure => failure.Value
+    Success(var message) => message,
+    Failure(var message) => message
 });
 
 return report.ToExitCode();
 
-Result<string, string> Find(CustomerDirectory directory, string[] args) =>
+static Result<string, string> Find(CustomerDirectory directory, string[] args) =>
     args.ElementAtOrDefault(1).ToOption() switch
     {
-        Some<string> { Value: var text } when int.TryParse(text, out var id) =>
-            directory.Find(id) switch
-            {
-                Some<Customer> { Value: var customer } => Result.Return<string, string>(Describe(customer)),
-                None => Result.Failure<string, string>($"No customer with id {id}.")
-            },
-        Some<string> { Value: var text } => Result.Failure<string, string>($"'{text}' is not a customer id."),
-        None => Result.Failure<string, string>("find requires a customer id.")
+        Some(var text) when int.TryParse(text, out var id) => directory.Find(id) switch
+        {
+            FoundCustomer.Some(var customer) => new Success(Describe(customer)),
+            None => new Failure($"No customer with id {id}.")
+        },
+        Some(var text) => new Failure($"'{text}' is not a customer id."),
+        None => new Failure("find requires a customer id.")
     };
 
 // Validate and register as one pipeline, then translate the domain error for the console.

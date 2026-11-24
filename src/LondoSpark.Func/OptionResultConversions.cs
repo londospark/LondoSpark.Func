@@ -10,7 +10,7 @@ public static class OptionResultConversions
         public Result<TSome, Unit> ToResult() =>
             option switch
             {
-                Some<TSome> some => Result.Return<TSome, Unit>(some.Value),
+                Option<TSome>.Some(var some) => Result.Return<TSome, Unit>(some),
                 None => Result.Failure<TSome, Unit>(Unit.Value)
             };
     }
@@ -22,8 +22,9 @@ public static class OptionResultConversions
         public Option<TSuccess> ToOption() =>
             result switch
             {
-                Success<TSuccess> success => new Some<TSuccess>(success.Value),
-                Failure<Unit> => new None()
+                Result<TSuccess, Unit>.Success(var success) => new Option<TSuccess>.Some(success),
+                Result<TSuccess, Unit>.Failure => new None(),
+                null => throw NoCase.Result()
             };
     }
 }

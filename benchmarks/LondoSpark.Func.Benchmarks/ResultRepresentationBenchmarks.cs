@@ -1,7 +1,6 @@
 using System;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Configs;
-using LondoSpark.Func;
 
 namespace LondoSpark.Func.Benchmarks;
 
@@ -15,8 +14,6 @@ public class ResultRepresentationBenchmarks
         Result.Return<Func<int, int>, string>(static value => value + 1);
     private static readonly Func<int, Result<int, string>> InlineBindIncrement =
         static value => Result.Return<int, string>(value + 1);
-    private static readonly Func<int, Result<int, string>> InlineBindFailure =
-        static _ => Result.Failure<int, string>("invalid");
     private static readonly Func<int, Result<int, string>> InlineReject =
         static _ => Result.Failure<int, string>("invalid");
 
@@ -43,8 +40,8 @@ public class ResultRepresentationBenchmarks
     public Result<int, string> InlineUnionDirectCase() =>
         InlineSuccess switch
         {
-            Success<int> value => new Success<int>(value.Value + 1),
-            Failure<string> error => error
+            Result<int, string>.Success value => new Result<int, string>.Success(value.Value + 1),
+            Result<int, string>.Failure error => error
         };
 
     [Benchmark(Baseline = true)]
@@ -104,22 +101,22 @@ public class ResultRepresentationBenchmarks
     public void VerifyUnionCases()
     {
         LegacyBoxedUnionResult<int, string> boxedFailed = new(new Failure<string>("invalid"));
-        Result<int, string> inlineFailed = new(new Failure<string>("invalid"));
+        Result<int, string> inlineFailed = new Result<int, string>.Failure("invalid");
         LegacyBoxedUnionResult<string?, string?> boxedSuccessNull =
             new(new Success<string?>(null));
-        Result<string?, string?> inlineSuccessNull = new(new Success<string?>(null));
+        Result<string?, string?> inlineSuccessNull = new Result<string?, string?>.Success(null);
 
-        if (InlineSuccess is not Success<int> { Value: 41 })
+        if (InlineSuccess is not Result<int, string>.Success { Value: 41 })
             throw new InvalidOperationException("The inline union failed to read its success case.");
 
         if (boxedFailed is not Failure<string> { Value: "invalid" }
-            || inlineFailed is not Failure<string> { Value: "invalid" })
+            || inlineFailed is not Result<int, string>.Failure { Value: "invalid" })
         {
             throw new InvalidOperationException("A union failed to read its failure case.");
         }
 
         if (boxedSuccessNull is not Success<string?> { Value: null }
-            || inlineSuccessNull is not Success<string?> { Value: null })
+            || inlineSuccessNull is not Result<string?, string?>.Success { Value: null })
         {
             throw new InvalidOperationException("A union failed to preserve a null success.");
         }

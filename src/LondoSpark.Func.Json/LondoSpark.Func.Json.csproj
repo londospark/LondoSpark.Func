@@ -8,6 +8,7 @@
     <RootNamespace>LondoSpark.Func.Json</RootNamespace>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
     <Authors>LondoSpark</Authors>
     <Description>System.Text.Json converters for LondoSpark.Func option and result values.</Description>
     <PackageTags>functional;option;result;json;serialization</PackageTags>

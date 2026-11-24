@@ -2,6 +2,7 @@
 **/obj/
 **/TestResults/
 BenchmarkDotNet.Artifacts/
+**/.bdn/
 .vs/
 .idea/
 *.user

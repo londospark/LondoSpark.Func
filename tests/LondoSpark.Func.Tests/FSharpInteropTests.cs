@@ -1,11 +1,12 @@
 using System.Threading.Tasks;
 
-using LondoSpark.Func;
 using LondoSpark.Func.FSharp;
 using Microsoft.FSharp.Core;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
+using static LondoSpark.Func.Option<string>;
+using static LondoSpark.Func.Result<string, string>;
 
 namespace LondoSpark.Func.Tests;
 
@@ -25,7 +26,7 @@ public sealed class FSharpInteropTests
     {
         var coreOption = FSharpOptionExtensions.ToOption(FSharpOption<string>.Some("present"));
 
-        await Assert.That(coreOption is Some<string> { Value: "present" }).IsTrue();
+        await Assert.That(coreOption is Some("present")).IsTrue();
         var roundTripped = FSharpOptionExtensions.ToFSharpOption(coreOption);
         if (roundTripped is null)
         {
@@ -40,7 +41,7 @@ public sealed class FSharpInteropTests
     {
         var coreOption = FSharpOptionExtensions.ToOption(FSharpOption<string?>.Some(null));
 
-        await Assert.That(coreOption is Some<string?> { Value: null }).IsTrue();
+        await Assert.That(coreOption is Some(null)).IsTrue();
         var roundTripped = FSharpOptionExtensions.ToFSharpOption(coreOption);
         await Assert.That(roundTripped is not null).IsTrue();
         if (roundTripped is null)
@@ -57,7 +58,7 @@ public sealed class FSharpInteropTests
         var coreResult = FSharpResultExtensions.ToResult(
             FSharpResult<string, string>.NewOk("success"));
 
-        await Assert.That(coreResult is Success<string> { Value: "success" }).IsTrue();
+        await Assert.That(coreResult is Success("success")).IsTrue();
         var roundTripped = FSharpResultExtensions.ToFSharpResult(coreResult);
         await Assert.That(roundTripped.IsOk).IsTrue();
         await Assert.That(roundTripped.ResultValue).IsEqualTo("success");
@@ -69,7 +70,7 @@ public sealed class FSharpInteropTests
         var coreResult = FSharpResultExtensions.ToResult(
             FSharpResult<string, string>.NewError("failure"));
 
-        await Assert.That(coreResult is Failure<string> { Value: "failure" }).IsTrue();
+        await Assert.That(coreResult is Failure("failure")).IsTrue();
         var roundTripped = FSharpResultExtensions.ToFSharpResult(coreResult);
         await Assert.That(roundTripped.IsError).IsTrue();
         await Assert.That(roundTripped.ErrorValue).IsEqualTo("failure");
@@ -81,7 +82,7 @@ public sealed class FSharpInteropTests
         var coreResult = FSharpResultExtensions.ToResult(
             FSharpResult<string?, string?>.NewOk(null));
 
-        await Assert.That(coreResult is Success<string?> { Value: null }).IsTrue();
+        await Assert.That(coreResult is Success(null)).IsTrue();
         var roundTripped = FSharpResultExtensions.ToFSharpResult(coreResult);
         await Assert.That(roundTripped.IsOk).IsTrue();
         await Assert.That(roundTripped.ResultValue is null).IsTrue();
@@ -93,9 +94,22 @@ public sealed class FSharpInteropTests
         var coreResult = FSharpResultExtensions.ToResult(
             FSharpResult<string?, string?>.NewError(null));
 
-        await Assert.That(coreResult is Failure<string?> { Value: null }).IsTrue();
+        await Assert.That(coreResult is Failure(null)).IsTrue();
         var roundTripped = FSharpResultExtensions.ToFSharpResult(coreResult);
         await Assert.That(roundTripped.IsError).IsTrue();
         await Assert.That(roundTripped.ErrorValue is null).IsTrue();
+    }
+
+    [Test]
+    public async Task FSharpValueOptionRoundTripsWithoutCaseLoss()
+    {
+        var some = FSharpOptionExtensions.ToOption(FSharpValueOption<string?>.NewValueSome(null));
+        var none = FSharpOptionExtensions.ToOption(FSharpValueOption<string?>.ValueNone);
+
+        await Assert.That(some is Some(null)).IsTrue();
+        await Assert.That(none is None).IsTrue();
+        await Assert.That(some.ToFSharpValueOption().IsSome).IsTrue();
+        await Assert.That(some.ToFSharpValueOption().Value is null).IsTrue();
+        await Assert.That(none.ToFSharpValueOption().IsNone).IsTrue();
     }
 }

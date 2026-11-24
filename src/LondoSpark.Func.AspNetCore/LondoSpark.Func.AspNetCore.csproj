@@ -8,6 +8,7 @@
     <RootNamespace>LondoSpark.Func.AspNetCore</RootNamespace>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
     <Authors>LondoSpark</Authors>
     <Description>Maps LondoSpark.Func option, result, and validation values to ASP.NET Core HTTP results.</Description>
     <PackageTags>functional;option;result;validation;aspnetcore</PackageTags>

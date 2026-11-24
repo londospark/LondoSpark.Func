@@ -1,4 +1,3 @@
-using LondoSpark.Func;
 using TUnit.Core;
 using TUnit.FsCheck;
 
@@ -50,8 +49,8 @@ public sealed class EqualityProperties
     [Test, FsCheckProperty]
     public bool ResultEqualityDistinguishesCasesAndPayloads(int value)
     {
-        Result<int, int> success = Result.Return<int, int>(value);
-        Result<int, int> failure = Result.Failure<int, int>(value);
+        var success = Result.Return<int, int>(value);
+        var failure = Result.Failure<int, int>(value);
 
         return !success.Equals(failure)
             && !failure.Equals(success)

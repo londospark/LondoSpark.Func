@@ -3,6 +3,10 @@ root = true
 [*.cs]
 # File-scoped namespaces are required style for this repository.
 csharp_style_namespace_declarations = file_scoped:warning
+# Locals use 'var' everywhere; the type is named by the initialiser.
+csharp_style_var_for_built_in_types = true:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = true:warning
 # Prefer expression-bodied members whenever the body fits on one line.
 csharp_style_expression_bodied_constructors = when_on_single_line:warning
 csharp_style_expression_bodied_methods = when_on_single_line:warning
@@ -23,6 +27,28 @@ dotnet_diagnostic.CA1716.severity = none
 
 # IDE0022: Use block body for method
 dotnet_diagnostic.IDE0022.severity = suggestion
+
+# Style rules the IDE offers but this repository does not adopt. The Roslyn
+# language server reports more style diagnostics than the build does, and the
+# ones it sends without a severity are painted as errors by VS Code, so each
+# opt-out is recorded here rather than left to each contributor's editor.
+# IDE0034: 'default' expression can be simplified - the explicit type is the point.
+dotnet_diagnostic.IDE0034.severity = none
+# IDE0039: Use local function - lambdas assigned to delegates read better here.
+dotnet_diagnostic.IDE0039.severity = none
+# IDE0047: Remove unnecessary parentheses - grouping documents property symmetry.
+dotnet_diagnostic.IDE0047.severity = none
+# IDE0090: 'new' expression can be simplified - case construction names its type.
+dotnet_diagnostic.IDE0090.severity = none
+# IDE0130: Namespace does not match folder structure - examples live in
+# examples/<Name>/ but keep the Examples.<Name> namespace.
+dotnet_diagnostic.IDE0130.severity = none
+# IDE0200: Remove lambda expression - method groups are a separate style choice.
+dotnet_diagnostic.IDE0200.severity = none
+# IDE0270: Null check can be simplified - the explicit throw reads as intent.
+dotnet_diagnostic.IDE0270.severity = none
+# IDE0290: Use primary constructor - constructors stay explicit for XML docs.
+dotnet_diagnostic.IDE0290.severity = none
 
 [tests/**/*.cs]
 # TUnit discovers public test types, and tests have no synchronization context.

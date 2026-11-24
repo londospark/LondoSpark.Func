@@ -1,17 +1,21 @@
 using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace LondoSpark.Func.Json;
 
 /// <summary>Serializes <see cref="Result{TSuccess, TFailure}"/> as <c>{"success": value}</c> or <c>{"failure": error}</c>.</summary>
-/// <remarks>Reading is streaming: the payload is deserialized directly from the reader without building a document.</remarks>
+/// <remarks>
+/// Reading is streaming: the payload is deserialized directly from the reader without building a document.
+/// Property names follow the configured naming policy and case sensitivity, and payload type metadata is
+/// resolved once per serializer configuration rather than on every call.
+/// </remarks>
 /// <typeparam name="TSuccess">The success value type.</typeparam>
 /// <typeparam name="TFailure">The failure value type.</typeparam>
 public sealed class ResultJsonConverter<TSuccess, TFailure> : JsonConverter<Result<TSuccess, TFailure>>
 {
-    private static readonly JsonEncodedText SuccessProperty = JsonEncodedText.Encode("success");
-    private static readonly JsonEncodedText FailureProperty = JsonEncodedText.Encode("failure");
+    private State? _state;
 
     /// <inheritdoc/>
     /// <exception cref="JsonException">The payload is not a single-property object with a success or failure property.</exception>
@@ -25,6 +29,7 @@ public sealed class ResultJsonConverter<TSuccess, TFailure> : JsonConverter<Resu
             throw new JsonException("Expected an object with a 'success' or 'failure' property.");
         }
 
+        var state = GetState(options);
         reader.Read();
 
         if (reader.TokenType != JsonTokenType.PropertyName)
@@ -33,17 +38,17 @@ public sealed class ResultJsonConverter<TSuccess, TFailure> : JsonConverter<Resu
         }
 
         Result<TSuccess, TFailure> result;
-        if (reader.ValueTextEquals(SuccessProperty.EncodedUtf8Bytes))
+        if (state.Success.Matches(ref reader))
         {
             reader.Read();
             result = Result.Return<TSuccess, TFailure>(
-                JsonSerializer.Deserialize<TSuccess>(ref reader, options)!);
+                JsonSerializer.Deserialize(ref reader, state.SuccessTypeInfo)!);
         }
-        else if (reader.ValueTextEquals(FailureProperty.EncodedUtf8Bytes))
+        else if (state.Failure.Matches(ref reader))
         {
             reader.Read();
             result = Result.Failure<TSuccess, TFailure>(
-                JsonSerializer.Deserialize<TFailure>(ref reader, options)!);
+                JsonSerializer.Deserialize(ref reader, state.FailureTypeInfo)!);
         }
         else
         {
@@ -61,27 +66,55 @@ public sealed class ResultJsonConverter<TSuccess, TFailure> : JsonConverter<Resu
     }
 
     /// <inheritdoc/>
+    /// <exception cref="JsonException"><paramref name="value"/> is <see langword="default"/> and contains no case.</exception>
     public override void Write(
         Utf8JsonWriter writer,
         Result<TSuccess, TFailure> value,
         JsonSerializerOptions options)
     {
+        var state = GetState(options);
+
         switch (value)
         {
-            case Success<TSuccess> success:
+            case Result<TSuccess, TFailure>.Success(var success):
                 writer.WriteStartObject();
-                writer.WritePropertyName(SuccessProperty);
-                JsonSerializer.Serialize(writer, success.Value, options);
+                writer.WritePropertyName(state.Success.Encoded);
+                JsonSerializer.Serialize(writer, success, state.SuccessTypeInfo);
                 writer.WriteEndObject();
                 break;
-            case Failure<TFailure> failure:
+            case Result<TSuccess, TFailure>.Failure(var failure):
                 writer.WriteStartObject();
-                writer.WritePropertyName(FailureProperty);
-                JsonSerializer.Serialize(writer, failure.Value, options);
+                writer.WritePropertyName(state.Failure.Encoded);
+                JsonSerializer.Serialize(writer, failure, state.FailureTypeInfo);
                 writer.WriteEndObject();
                 break;
             default:
                 throw new JsonException("A default result has no case to serialize.");
         }
+    }
+
+    // See OptionJsonConverter: the cache is keyed by the options it was built from.
+    private State GetState(JsonSerializerOptions options)
+    {
+        var state = _state;
+        if (state is null || !ReferenceEquals(state.Options, options))
+        {
+            _state = state = new State(options);
+        }
+
+        return state;
+    }
+
+    private sealed class State(JsonSerializerOptions options)
+    {
+        public JsonSerializerOptions Options { get; } = options;
+
+        public JsonTypeInfo<TSuccess> SuccessTypeInfo { get; } = options.GetTypeInfo<TSuccess>();
+
+        public JsonTypeInfo<TFailure> FailureTypeInfo { get; } = options.GetTypeInfo<TFailure>();
+
+        public JsonCaseName Success { get; } = new("success", options);
+
+        public JsonCaseName Failure { get; } = new("failure", options);
     }
 }

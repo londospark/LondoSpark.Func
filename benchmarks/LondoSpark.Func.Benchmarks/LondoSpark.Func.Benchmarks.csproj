@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/LondoSpark.Func/LondoSpark.Func.csproj" />
+    <ProjectReference Include="../../src/LondoSpark.Func.Json/LondoSpark.Func.Json.csproj" />
   </ItemGroup>
 
 </Project>

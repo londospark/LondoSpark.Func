@@ -1,6 +1,5 @@
 using System;
 using BenchmarkDotNet.Attributes;
-using LondoSpark.Func;
 
 namespace LondoSpark.Func.Benchmarks;
 
@@ -17,7 +16,7 @@ public class OptionCompositionBenchmarks
     public Option<int> OptionDirectCase() =>
         Some switch
         {
-            Some<int> value => Option.Return(value.Value + 1),
+            Option<int>.Some value => Option.Return(value.Value + 1),
             None none => none
         };
 
@@ -43,8 +42,8 @@ public class ResultCompositionBenchmarks
     public Result<int, string> ResultDirectCase() =>
         Successful switch
         {
-            Success<int> value => Result.Return<int, string>(value.Value + 1),
-            Failure<string> error => error
+            Result<int, string>.Success value => Result.Return<int, string>(value.Value + 1),
+            Result<int, string>.Failure error => error
         };
 
     [Benchmark]
@@ -69,9 +68,9 @@ public class OptionQueryCompositionBenchmarks
     public Option<int> DirectCase() =>
         Source switch
         {
-            Some<int> first => Second(first.Value) switch
+            Option<int>.Some first => Second(first.Value) switch
             {
-                Some<int> second => Option.Return(Project(first.Value, second.Value)),
+                Option<int>.Some second => Option.Return(Project(first.Value, second.Value)),
                 None none => none
             },
             None none => none
@@ -96,12 +95,12 @@ public class ResultQueryCompositionBenchmarks
     public Result<int, string> DirectCase() =>
         Source switch
         {
-            Success<int> first => Second(first.Value) switch
+            Result<int, string>.Success first => Second(first.Value) switch
             {
-                Success<int> second => Result.Return<int, string>(Project(first.Value, second.Value)),
-                Failure<string> error => error
+                Result<int, string>.Success second => Result.Return<int, string>(Project(first.Value, second.Value)),
+                Result<int, string>.Failure error => error
             },
-            Failure<string> error => error
+            Result<int, string>.Failure error => error
         };
 
     [Benchmark]
@@ -123,8 +122,8 @@ public class ErrorResultCompositionBenchmarks
     public ErrorResult<int, string> ErrorResultDirectCase() =>
         Failed.Value switch
         {
-            Success<int> success => new ErrorResult<int, string>(success),
-            Failure<string> error => ErrorResult.Return<int, string>($"{error.Value}!")
+            Result<int, string>.Success success => new ErrorResult<int, string>(success),
+            Result<int, string>.Failure error => ErrorResult.Return<int, string>($"{error.Value}!")
         };
 
     [Benchmark]
@@ -150,11 +149,11 @@ public class ErrorResultQueryCompositionBenchmarks
     public ErrorResult<int, string> DirectCase() =>
         Source.Value switch
         {
-            Success<int> success => new ErrorResult<int, string>(success),
-            Failure<string> firstError => Second(firstError.Value).Value switch
+            Result<int, string>.Success success => new ErrorResult<int, string>(success),
+            Result<int, string>.Failure firstError => Second(firstError.Value).Value switch
             {
-                Success<int> secondSuccess => new ErrorResult<int, string>(secondSuccess),
-                Failure<string> secondError =>
+                Result<int, string>.Success secondSuccess => new ErrorResult<int, string>(secondSuccess),
+                Result<int, string>.Failure secondError =>
                     ErrorResult.Return<int, string>(Project(firstError.Value, secondError.Value))
             }
         };
@@ -176,9 +175,9 @@ public class ValidationSuccessBenchmarks
     public Validation<int, string> DirectFunctionCall() =>
         Function switch
         {
-            Success<Func<int, int>> function =>
+            Validation<Func<int, int>, string>.Success function =>
                 Validation.Return<int, string>(function.Value(41)),
-            Failure<NonEmptyList<string>> errors => errors
+            Validation<Func<int, int>, string>.Failure(var errors) => new Validation<int, string>.Failure(errors)
         };
 
     [Benchmark]
@@ -192,9 +191,9 @@ public class ValidationErrorAccumulationBenchmarks
     private static readonly NonEmptyList<string> FunctionErrors = new("first");
     private static readonly NonEmptyList<string> ValueErrors = new("second");
     private static readonly Validation<Func<int, int>, string> FailedFunction =
-        new Failure<NonEmptyList<string>>(FunctionErrors);
+        new Validation<Func<int, int>, string>.Failure(FunctionErrors);
     private static readonly Validation<int, string> FailedValue =
-        new Failure<NonEmptyList<string>>(ValueErrors);
+        new Validation<int, string>.Failure(ValueErrors);
 
     [Benchmark(Baseline = true)]
     public NonEmptyList<string> DirectErrorAppend() =>

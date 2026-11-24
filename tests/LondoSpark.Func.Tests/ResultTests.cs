@@ -2,10 +2,10 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-using LondoSpark.Func;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
+using static LondoSpark.Func.Result<int, string>;
 
 namespace LondoSpark.Func.Tests;
 
@@ -24,23 +24,23 @@ public sealed class ResultTests
     [Test]
     public async Task ResultFunctorIdentityAndComposition()
     {
-        Result<int, string> source = Result.Return<int, string>(7);
+        var source = Result.Return<int, string>(7);
         var identity = source.Select(value => value);
         var composed = source.Select(value => value + 2).Select(value => value * 3);
         var separate = source.Select(value => (value + 2) * 3);
 
-        await Assert.That(identity is Success<int> { Value: 7 }).IsTrue();
-        await Assert.That(composed is Success<int> { Value: 27 }).IsTrue();
-        await Assert.That(separate is Success<int> { Value: 27 }).IsTrue();
+        await Assert.That(identity is Success(7)).IsTrue();
+        await Assert.That(composed is Success(27)).IsTrue();
+        await Assert.That(separate is Success(27)).IsTrue();
     }
 
     [Test]
     public async Task ResultApplyUsesFunctionAndValueSuccesses()
     {
-        Result<Func<int, int>, string> function = Result.Return<Func<int, int>, string>(value => value * 6);
-        Result<int, string> value = Result.Return<int, string>(7);
+        var function = Result.Return<Func<int, int>, string>(value => value * 6);
+        var value = Result.Return<int, string>(7);
 
-        await Assert.That(function.Apply(value) is Success<int> { Value: 42 }).IsTrue();
+        await Assert.That(function.Apply(value) is Success(42)).IsTrue();
     }
 
     [Test]
@@ -48,9 +48,9 @@ public sealed class ResultTests
     {
         var functionCallbackCalled = false;
 
-        Result<Func<int, int>, string> functionFailure =
+        var functionFailure =
             Result.Failure<Func<int, int>, string>("function failure");
-        Result<int, string> valueFailure = Result.Failure<int, string>("value failure");
+        var valueFailure = Result.Failure<int, string>("value failure");
 
         var bothFailures = functionFailure.Apply(valueFailure);
         var functionSuccessValueFailure =
@@ -59,9 +59,9 @@ public sealed class ResultTests
         var functionFailureValueSuccess =
             functionFailure.Apply(Result.Return<int, string>(0));
 
-        await Assert.That(bothFailures is Failure<string> { Value: "function failure" }).IsTrue();
-        await Assert.That(functionSuccessValueFailure is Failure<string> { Value: "value failure" }).IsTrue();
-        await Assert.That(functionFailureValueSuccess is Failure<string> { Value: "function failure" }).IsTrue();
+        await Assert.That(bothFailures is Failure("function failure")).IsTrue();
+        await Assert.That(functionSuccessValueFailure is Failure("value failure")).IsTrue();
+        await Assert.That(functionFailureValueSuccess is Failure("function failure")).IsTrue();
         await Assert.That(functionCallbackCalled).IsFalse();
     }
 
@@ -70,7 +70,7 @@ public sealed class ResultTests
     {
         var bindCalled = false;
         var selectCalled = false;
-        Result<int, string> failure = Result.Failure<int, string>("inactive");
+        var failure = Result.Failure<int, string>("inactive");
 
         var bound = failure.Bind(value =>
         {
@@ -83,8 +83,8 @@ public sealed class ResultTests
             return value + 1;
         });
 
-        await Assert.That(bound is Failure<string> { Value: "inactive" }).IsTrue();
-        await Assert.That(selected is Failure<string> { Value: "inactive" }).IsTrue();
+        await Assert.That(bound is Failure("inactive")).IsTrue();
+        await Assert.That(selected is Failure("inactive")).IsTrue();
         await Assert.That(bindCalled).IsFalse();
         await Assert.That(selectCalled).IsFalse();
     }
@@ -92,24 +92,24 @@ public sealed class ResultTests
     [Test]
     public async Task ResultBindComposesSuccessfulValues()
     {
-        Result<int, string> result = Result.Return<int, string>(21);
+        var result = Result.Return<int, string>(21);
         var bound = result.Bind(value => Result.Return<long, string>(value * 2L));
 
-        await Assert.That(bound is Success<long> { Value: 42L }).IsTrue();
+        await Assert.That(bound is Result<long, string>.Success(42L)).IsTrue();
     }
 
     [Test]
     public async Task ResultBindSkipsBinderForFailure()
     {
         var binderCalled = false;
-        Result<int, string> result = Result.Failure<int, string>("invalid");
+        var result = Result.Failure<int, string>("invalid");
         var bound = result.Bind(value =>
         {
             binderCalled = true;
             return Result.Return<int, string>(value * 2);
         });
 
-        await Assert.That(bound is Failure<string> { Value: "invalid" }).IsTrue();
+        await Assert.That(bound is Failure("invalid")).IsTrue();
         await Assert.That(binderCalled).IsFalse();
     }
 
@@ -119,7 +119,7 @@ public sealed class ResultTests
         var result = from _1 in MathOperations.Divide(10.0, 2.0)
                      from _2 in MathOperations.Divide(10.0, _1)
                      select _2;
-        await Assert.That(result is Success<double> { Value: 2.0 }).IsTrue();
+        await Assert.That(result is Result<double, DivideByZeroError>.Success(2.0)).IsTrue();
     }
 
     [Test]
@@ -128,18 +128,18 @@ public sealed class ResultTests
         var result = from first in MathOperations.Divide(10.0, 2.0)
                      from second in MathOperations.Divide(10.0, first)
                      select first + second;
-        await Assert.That(result is Success<double> { Value: 7.0 }).IsTrue();
+        await Assert.That(result is Result<double, DivideByZeroError>.Success(7.0)).IsTrue();
     }
 
     [Test]
     public async Task ResultQueryProjectorChangesType()
     {
-        Result<string, DivideByZeroError> result =
+        var result =
             from first in MathOperations.Divide(10.0, 2.0)
             from second in MathOperations.Divide(10.0, first)
             select $"{first:F0}:{second:F0}";
 
-        await Assert.That(result is Success<string> { Value: "5:2" }).IsTrue();
+        await Assert.That(result is Result<string, DivideByZeroError>.Success("5:2")).IsTrue();
     }
 
     [Test]
@@ -150,21 +150,21 @@ public sealed class ResultTests
         var recovered = MathOperations.Divide(10.0, 0.0)
             .BindError(_ => Result.Return<double, string>(42.0));
 
-        await Assert.That(mapped is Failure<string> { Value: "division failed" }).IsTrue();
-        await Assert.That(recovered is Success<double> { Value: 42.0 }).IsTrue();
+        await Assert.That(mapped is Result<double, string>.Failure("division failed")).IsTrue();
+        await Assert.That(recovered is Result<double, string>.Success(42.0)).IsTrue();
     }
 
     [Test]
     public async Task ResultQueryPreservesFirstFailureAndSkipsLaterBinder()
     {
         var laterBinderCalled = false;
-        Result<int, string> failure = Result.Failure<int, string>("first failure");
+        var failure = Result.Failure<int, string>("first failure");
 
         var result = from first in failure
                      from second in ResultStep(first)
                      select first + second;
 
-        await Assert.That(result is Failure<string> { Value: "first failure" }).IsTrue();
+        await Assert.That(result is Failure("first failure")).IsTrue();
         await Assert.That(laterBinderCalled).IsFalse();
 
         Result<int, string> ResultStep(int value)
@@ -178,8 +178,8 @@ public sealed class ResultTests
     public async Task ResultQuerySkipsProjectorWhenSecondComputationFails()
     {
         var projectorCalled = false;
-        Result<int, string> source = Result.Return<int, string>(1);
-        Result<int, string> secondFailure = Result.Failure<int, string>("second failure");
+        var source = Result.Return<int, string>(1);
+        var secondFailure = Result.Failure<int, string>("second failure");
 
         var result = source.SelectMany(
             _ => secondFailure,
@@ -189,32 +189,32 @@ public sealed class ResultTests
                 return first + second;
             });
 
-        await Assert.That(result is Failure<string> { Value: "second failure" }).IsTrue();
+        await Assert.That(result is Failure("second failure")).IsTrue();
         await Assert.That(projectorCalled).IsFalse();
     }
 
     [Test]
     public async Task ResultSuccessNullAndFailureNullRetainDistinctCases()
     {
-        Result<string?, string?> successNull =
+        var successNull =
             Result.Return<string?, string?>(null);
-        Result<string?, string?> failureNull =
+        var failureNull =
             Result.Failure<string?, string?>(null);
 
-        await Assert.That(successNull is Success<string?> { Value: null }).IsTrue();
-        await Assert.That(failureNull is Failure<string?> { Value: null }).IsTrue();
+        await Assert.That(successNull is Result<string?, string?>.Success(null)).IsTrue();
+        await Assert.That(failureNull is Result<string?, string?>.Failure(null)).IsTrue();
     }
 
     [Test]
     public async Task ResultDefaultContainsNoCase()
     {
         Result<int, string> defaultResult = default;
-        Result<int, string> successful = Result.Return<int, string>(1);
-        Result<int, string> failed = Result.Failure<int, string>("invalid");
+        var successful = Result.Return<int, string>(1);
+        var failed = Result.Failure<int, string>("invalid");
 
         await Assert.That(defaultResult.HasValue).IsFalse();
-        await Assert.That(defaultResult is Success<int>).IsFalse();
-        await Assert.That(defaultResult is Failure<string>).IsFalse();
+        await Assert.That(defaultResult is Success).IsFalse();
+        await Assert.That(defaultResult is Failure).IsFalse();
         await Assert.That(successful.HasValue).IsTrue();
         await Assert.That(failed.HasValue).IsTrue();
 
@@ -235,18 +235,17 @@ public sealed class ResultTests
     {
         await Assert.That(Result.Return<int, string>(1).ToExitCode()).IsEqualTo(0);
         await Assert.That(Result.Failure<int, string>("invalid").ToExitCode()).IsEqualTo(1);
-        await Assert.That(default(Result<int, string>).ToExitCode()).IsEqualTo(1);
     }
 
     [Test]
     public async Task ResultEqualityComparesCaseAndPayload()
     {
-        Result<int, string> success = Result.Return<int, string>(3);
-        Result<int, string> sameSuccess = new Success<int>(3);
-        Result<int, string> otherSuccess = Result.Return<int, string>(4);
-        Result<int, string> failure = Result.Failure<int, string>("invalid");
-        Result<int, string> sameFailure = new Failure<string>("invalid");
-        Result<int, string> otherFailure = Result.Failure<int, string>("different");
+        var success = Result.Return<int, string>(3);
+        Result<int, string> sameSuccess = new Success(3);
+        var otherSuccess = Result.Return<int, string>(4);
+        var failure = Result.Failure<int, string>("invalid");
+        Result<int, string> sameFailure = new Failure("invalid");
+        var otherFailure = Result.Failure<int, string>("different");
 
         await Assert.That(success).IsEqualTo(sameSuccess);
         await Assert.That(success == sameSuccess).IsTrue();
@@ -264,9 +263,9 @@ public sealed class ResultTests
     {
         var selectCalledForSuccess = false;
         var selectCalledForFailure = false;
-        Result<string?, string?> successNull =
+        var successNull =
             Result.Return<string?, string?>(null);
-        Result<string?, string?> failureNull =
+        var failureNull =
             Result.Failure<string?, string?>(null);
 
         var mappedSuccess = successNull.Select(value =>
@@ -280,8 +279,8 @@ public sealed class ResultTests
             return "should-not-be-produced";
         });
 
-        await Assert.That(mappedSuccess is Success<string> { Value: "mapped-null-success" }).IsTrue();
-        await Assert.That(mappedFailure is Failure<string?> { Value: null }).IsTrue();
+        await Assert.That(mappedSuccess is Result<string, string>.Success("mapped-null-success")).IsTrue();
+        await Assert.That(mappedFailure is Result<string, string>.Failure(null)).IsTrue();
         await Assert.That(selectCalledForSuccess).IsTrue();
         await Assert.That(selectCalledForFailure).IsFalse();
     }
@@ -290,9 +289,9 @@ public sealed class ResultTests
     public async Task ResultBindPassesNullSuccessAndSkipsNullFailure()
     {
         var binderReceivedNull = false;
-        Result<string?, string?> successNull =
+        var successNull =
             Result.Return<string?, string?>(null);
-        Result<string?, string?> failureNull =
+        var failureNull =
             Result.Failure<string?, string?>(null);
 
         var boundSuccess = successNull.Bind(value =>
@@ -309,8 +308,8 @@ public sealed class ResultTests
         });
 
         await Assert.That(binderReceivedNull).IsTrue();
-        await Assert.That(boundSuccess is Success<string?> { Value: null }).IsTrue();
-        await Assert.That(boundFailure is Failure<string?> { Value: null }).IsTrue();
+        await Assert.That(boundSuccess is Result<string, string>.Success(null)).IsTrue();
+        await Assert.That(boundFailure is Result<string, string>.Failure(null)).IsTrue();
         await Assert.That(failureBinderCalled).IsFalse();
     }
 
@@ -318,9 +317,9 @@ public sealed class ResultTests
     public async Task ResultMapErrorAndBindErrorPreserveNullCaseIdentity()
     {
         var errorBinderCalledForSuccess = false;
-        Result<string?, string?> successNull =
+        var successNull =
             Result.Return<string?, string?>(null);
-        Result<string?, string?> failureNull =
+        var failureNull =
             Result.Failure<string?, string?>(null);
 
         var mappedSuccess = successNull.MapError(_ => "should-not-be-produced");
@@ -334,44 +333,44 @@ public sealed class ResultTests
             return failureNull;
         });
 
-        await Assert.That(mappedSuccess is Success<string?> { Value: null }).IsTrue();
-        await Assert.That(mappedFailure is Failure<string> { Value: "mapped-null-failure" }).IsTrue();
-        await Assert.That(recoveredFailure is Success<string?> { Value: null }).IsTrue();
-        await Assert.That(preservedSuccess is Success<string?> { Value: null }).IsTrue();
+        await Assert.That(mappedSuccess is Result<string, string>.Success(null)).IsTrue();
+        await Assert.That(mappedFailure is Result<string, string>.Failure("mapped-null-failure")).IsTrue();
+        await Assert.That(recoveredFailure is Result<string, string>.Success(null)).IsTrue();
+        await Assert.That(preservedSuccess is Result<string, string>.Success(null)).IsTrue();
         await Assert.That(errorBinderCalledForSuccess).IsFalse();
     }
 
     [Test]
     public async Task ResultApplyDistinguishesNullSuccessAndFailurePayloads()
     {
-        Result<Func<string?, string>, string?> functionSuccess =
+        var functionSuccess =
             Result.Return<Func<string?, string>, string?>(value =>
                 value is null ? "function-received-null" : value);
-        Result<string?, string?> valueSuccess =
+        var valueSuccess =
             Result.Return<string?, string?>(null);
-        Result<Func<string?, string>, string?> functionFailure =
+        var functionFailure =
             Result.Failure<Func<string?, string>, string?>(null);
-        Result<string?, string?> valueFailure =
+        var valueFailure =
             Result.Failure<string?, string?>(null);
 
         var appliedSuccess = functionSuccess.Apply(valueSuccess);
         var functionFailureResult = functionFailure.Apply(valueSuccess);
         var valueFailureResult = functionSuccess.Apply(valueFailure);
 
-        await Assert.That(appliedSuccess is Success<string> { Value: "function-received-null" }).IsTrue();
-        await Assert.That(functionFailureResult is Failure<string?> { Value: null }).IsTrue();
-        await Assert.That(valueFailureResult is Failure<string?> { Value: null }).IsTrue();
+        await Assert.That(appliedSuccess is Result<string, string>.Success("function-received-null")).IsTrue();
+        await Assert.That(functionFailureResult is Result<string, string>.Failure(null)).IsTrue();
+        await Assert.That(valueFailureResult is Result<string, string>.Failure(null)).IsTrue();
     }
 
     [Test]
     public async Task ResultSelectManyComposesNullSuccessesAndPreservesNullFailures()
     {
         var projectorCalled = false;
-        Result<string?, string?> successNull =
+        var successNull =
             Result.Return<string?, string?>(null);
-        Result<string?, string?> failureNull =
+        var failureNull =
             Result.Failure<string?, string?>(null);
-        Result<string?, string?> secondFailureNull =
+        var secondFailureNull =
             Result.Failure<string?, string?>(null);
 
         var composedSuccess = successNull.SelectMany(
@@ -388,9 +387,9 @@ public sealed class ResultTests
             _ => secondFailureNull,
             (_, _) => "should-not-be-projected");
 
-        await Assert.That(composedSuccess is Success<string> { Value: "both-successes-null" }).IsTrue();
-        await Assert.That(composedFailure is Failure<string?> { Value: null }).IsTrue();
-        await Assert.That(composedSecondFailure is Failure<string?> { Value: null }).IsTrue();
+        await Assert.That(composedSuccess is Result<string, string>.Success("both-successes-null")).IsTrue();
+        await Assert.That(composedFailure is Result<string, string>.Failure(null)).IsTrue();
+        await Assert.That(composedSecondFailure is Result<string, string>.Failure(null)).IsTrue();
         await Assert.That(projectorCalled).IsTrue();
     }
 
@@ -401,11 +400,11 @@ public sealed class ResultTests
 
         // Success is tag 1. Fill the unused failure slot with a value that Success
         // can never carry and confirm the value is still just the same success.
-        Result<int, int> successWithStaleFailure = Result.Return<int, int>(1);
+        var successWithStaleFailure = Result.Return<int, int>(1);
         Unsafe.As<Result<int, int>, ResultMirror>(ref successWithStaleFailure) =
-            new(new Success<int>(1), new Failure<int>(99), 1);
+            new(1, 99, 1);
 
-        await Assert.That(successWithStaleFailure is Success<int> { Value: 1 }).IsTrue();
+        await Assert.That(successWithStaleFailure is Result<int, int>.Success(1)).IsTrue();
         await Assert.That(successWithStaleFailure).IsEqualTo(Result.Return<int, int>(1));
         await Assert.That(successWithStaleFailure == Result.Return<int, int>(1)).IsTrue();
         await Assert.That(successWithStaleFailure.GetHashCode())
@@ -414,16 +413,16 @@ public sealed class ResultTests
 
     private readonly struct ResultMirror
     {
-        public ResultMirror(Success<int> successValue, Failure<int> failureValue, byte tag)
+        public ResultMirror(int successValue, int failureValue, byte tag)
         {
             SuccessValue = successValue;
             FailureValue = failureValue;
             Tag = tag;
         }
 
-        public Success<int> SuccessValue { get; }
+        public int SuccessValue { get; }
 
-        public Failure<int> FailureValue { get; }
+        public int FailureValue { get; }
 
         public byte Tag { get; }
     }

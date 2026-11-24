@@ -8,10 +8,33 @@ namespace LondoSpark.Func;
 /// <typeparam name="TSuccess">The type of the success value.</typeparam>
 /// <typeparam name="TFailure">The type of the failure value.</typeparam>
 /// <remarks>
-/// Every value created by <c>Result.Return</c> or <c>Result.Failure</c> contains a case. Because this is a struct,
-/// <see langword="default"/> and <c>new()</c> produce a zero value that contains no case: <see cref="HasValue"/> is
-/// <see langword="false"/>, the case patterns do not match, and <see cref="Value"/> throws.
+/// <para>
+/// The cases are the nested <see cref="Success"/> and <see cref="Failure"/>. Import the closed result type once per
+/// file and a switch names its cases without type arguments, and stays exhaustive:
+/// <code>
+/// using static LondoSpark.Func.Result&lt;Customer, CustomerError&gt;;
+///
+/// var message = result switch
+/// {
+///     Success(var customer) => $"Registered {customer.Id}",
+///     Failure(var error) => error.Describe()
+/// };
+/// </code>
+/// When a file matches several result types, alias each one instead
+/// (<c>using Registration = Result&lt;Customer, CustomerError&gt;;</c>) and write <c>Registration.Success(var c)</c>.
+/// Both cases convert implicitly, so a method can <c>return new Success(customer);</c>.
+/// </para>
+/// <para>
+/// Every value created by <c>Result.Return</c>, <c>Result.Failure</c>, or a case contains a case. Because this is a
+/// struct, <see langword="default"/> and <c>new()</c> produce a zero value that contains no case: <see cref="HasValue"/>
+/// is <see langword="false"/>, the case patterns do not match, and <see cref="Value"/> and every extension method throw
+/// <see cref="InvalidOperationException"/>. The LSF0001 analyzer reports the ways such a value is usually written.
 /// Equality compares the active case and its payload.
+/// </para>
+/// <para>
+/// Both payloads are stored inline so neither case boxes; the struct is therefore as large as both payloads plus a
+/// tag (24 bytes for <c>Result&lt;long, long&gt;</c>). Prefer reference-typed or small failure payloads on hot paths.
+/// </para>
 /// </remarks>
 [Union]
 public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, TFailure>>
@@ -19,55 +42,56 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
     private const byte SuccessTag = 1;
     private const byte FailureTag = 2;
 
-    private readonly Success<TSuccess> _successValue;
-    private readonly Failure<TFailure> _failureValue;
+    private readonly TSuccess _success;
+    private readonly TFailure _failure;
     private readonly byte _tag;
 
-    /// <summary>Creates the successful case containing <paramref name="value"/>.</summary>
-    /// <param name="value">The success value to store.</param>
-    public Result(Success<TSuccess> value)
+    /// <summary>Creates the successful case.</summary>
+    /// <param name="value">The successful case, whose payload may be null.</param>
+    public Result(Success value)
     {
-        _successValue = value;
+        _success = value.Value;
+        _failure = default!;
         _tag = SuccessTag;
     }
 
-    /// <summary>Creates the failed case containing <paramref name="value"/>.</summary>
-    /// <param name="value">The failure value to store.</param>
-    public Result(Failure<TFailure> value)
+    /// <summary>Creates the failed case.</summary>
+    /// <param name="value">The failed case, whose payload may be null.</param>
+    public Result(Failure value)
     {
-        _failureValue = value;
+        _success = default!;
+        _failure = value.Value;
         _tag = FailureTag;
     }
 
-    /// <summary>Gets the boxed active case.</summary>
+    /// <summary>Gets the boxed active case; the union contract requires this <c>object</c> property, so reading it boxes.</summary>
     /// <exception cref="InvalidOperationException">This result is <see langword="default"/> or <c>new()</c> and contains no case.</exception>
     public object Value =>
         _tag switch
         {
-            SuccessTag => _successValue,
-            FailureTag => _failureValue,
-            _ => throw new InvalidOperationException(
-                "A default result contains no case. Construct results with Result.Return or Result.Failure.")
+            SuccessTag => new Success(_success),
+            FailureTag => new Failure(_failure),
+            _ => throw NoCase.Result()
         };
 
     /// <summary>Gets whether this result contains a case; <see langword="false"/> only for <see langword="default"/>.</summary>
     public bool HasValue => _tag is SuccessTag or FailureTag;
 
-    /// <summary>Gets the successful case when this result contains a <see cref="Success{TSuccess}"/>.</summary>
+    /// <summary>Gets the successful case when this result contains one.</summary>
     /// <param name="value">Receives the successful case, or its default value when this result does not contain it.</param>
     /// <returns><see langword="true"/> when this result contains a successful case.</returns>
-    public bool TryGetValue(out Success<TSuccess> value)
+    public bool TryGetValue(out Success value)
     {
-        value = _successValue;
+        value = new Success(_success);
         return _tag == SuccessTag;
     }
 
-    /// <summary>Gets the failed case when this result contains a <see cref="Failure{TFailure}"/>.</summary>
+    /// <summary>Gets the failed case when this result contains one.</summary>
     /// <param name="value">Receives the failed case, or its default value when this result does not contain it.</param>
     /// <returns><see langword="true"/> when this result contains a failed case.</returns>
-    public bool TryGetValue(out Failure<TFailure> value)
+    public bool TryGetValue(out Failure value)
     {
-        value = _failureValue;
+        value = new Failure(_failure);
         return _tag == FailureTag;
     }
 
@@ -78,8 +102,8 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
         _tag == other._tag
         && (_tag switch
         {
-            SuccessTag => EqualityComparer<Success<TSuccess>>.Default.Equals(_successValue, other._successValue),
-            FailureTag => EqualityComparer<Failure<TFailure>>.Default.Equals(_failureValue, other._failureValue),
+            SuccessTag => EqualityComparer<TSuccess>.Default.Equals(_success, other._success),
+            FailureTag => EqualityComparer<TFailure>.Default.Equals(_failure, other._failure),
             _ => true
         });
 
@@ -91,8 +115,8 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
     public override int GetHashCode() =>
         _tag switch
         {
-            SuccessTag => HashCode.Combine(SuccessTag, _successValue),
-            FailureTag => HashCode.Combine(FailureTag, _failureValue),
+            SuccessTag => HashCode.Combine(SuccessTag, _success),
+            FailureTag => HashCode.Combine(FailureTag, _failure),
             _ => _tag
         };
 
@@ -115,19 +139,21 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
     public override string ToString() =>
         _tag switch
         {
-            SuccessTag => $"Success({_successValue.Value})",
-            FailureTag => $"Failure({_failureValue.Value})",
+            SuccessTag => $"Success({_success})",
+            FailureTag => $"Failure({_failure})",
             _ => "Result(default)"
         };
+
+    /// <summary>The successful case of <see cref="Result{TSuccess, TFailure}"/>, holding a value that may be null.</summary>
+    /// <param name="Value">The successful value.</param>
+    /// <remarks>Match it positionally, <c>Success(var value)</c>, after <c>using static</c> on the closed result type.</remarks>
+    public readonly record struct Success(TSuccess Value);
+
+    /// <summary>The failed case of <see cref="Result{TSuccess, TFailure}"/>, holding an error that may be null.</summary>
+    /// <param name="Value">The failure value.</param>
+    /// <remarks>Match it positionally, <c>Failure(var error)</c>, after <c>using static</c> on the closed result type.</remarks>
+    public readonly record struct Failure(TFailure Value);
 }
-
-/// <summary>Wraps a successful result value, including null.</summary>
-/// <typeparam name="TSuccess">The type of the successful value.</typeparam>
-public readonly record struct Success<TSuccess>(TSuccess Value);
-
-/// <summary>Wraps a failed result value, including null.</summary>
-/// <typeparam name="TFailure">The type of the failure value.</typeparam>
-public readonly record struct Failure<TFailure>(TFailure Value);
 
 /// <summary>Starts a success-focused result computation.</summary>
 public static class Result
@@ -138,7 +164,7 @@ public static class Result
     /// <param name="value">The successful value.</param>
     /// <returns>A successful result containing <paramref name="value"/>.</returns>
     public static Result<TSuccess, TFailure> Return<TSuccess, TFailure>(TSuccess value) =>
-        new Success<TSuccess>(value);
+        new Result<TSuccess, TFailure>.Success(value);
 
     /// <summary>Places a value, including null, into the failure case.</summary>
     /// <typeparam name="TSuccess">The success type of the result.</typeparam>
@@ -146,7 +172,7 @@ public static class Result
     /// <param name="value">The value to store as a failure.</param>
     /// <returns>A failed result containing <paramref name="value"/>.</returns>
     public static Result<TSuccess, TFailure> Failure<TSuccess, TFailure>(TFailure value) =>
-        new Failure<TFailure>(value);
+        new Result<TSuccess, TFailure>.Failure(value);
 }
 
 /// <summary>Provides fluent, applicative, and query-syntax operations for <see cref="Result{TSuccess, TFailure}"/>.</summary>
@@ -161,8 +187,9 @@ public static class ResultExtensions
         public Result<TOut, TFailure> Select<TOut>(Func<TSuccess, TOut> selector) =>
             result switch
             {
-                Success<TSuccess> success => new Success<TOut>(selector(success.Value)),
-                Failure<TFailure> failure => new Failure<TFailure>(failure.Value)
+                Result<TSuccess, TFailure>.Success(var success) => new Result<TOut, TFailure>.Success(selector(success)),
+                Result<TSuccess, TFailure>.Failure(var failure) => new Result<TOut, TFailure>.Failure(failure),
+                null => throw NoCase.Result()
             };
 
         /// <summary>Composes a fallible next step, stopping at the first failure instead of requiring nested result checks.</summary>
@@ -172,18 +199,19 @@ public static class ResultExtensions
         public Result<TOut, TFailure> Bind<TOut>(Func<TSuccess, Result<TOut, TFailure>> binder) =>
             result switch
             {
-                Success<TSuccess> success => binder(success.Value),
-                Failure<TFailure> failure => new Failure<TFailure>(failure.Value)
+                Result<TSuccess, TFailure>.Success(var success) => binder(success),
+                Result<TSuccess, TFailure>.Failure(var failure) => new Result<TOut, TFailure>.Failure(failure),
+                null => throw NoCase.Result()
             };
 
         /// <summary>Maps this result to a process exit code, so a CLI can return failure without its own switch.</summary>
-        /// <returns><c>0</c> for a success; <c>1</c> for a failure or a default result.</returns>
+        /// <returns><c>0</c> for a success; <c>1</c> for a failure.</returns>
         public int ToExitCode() =>
             result switch
             {
-                Success<TSuccess> => 0,
-                Failure<TFailure> => 1,
-                _ => 1
+                Result<TSuccess, TFailure>.Success => 0,
+                Result<TSuccess, TFailure>.Failure => 1,
+                null => throw NoCase.Result()
             };
 
         /// <summary>Provides query-syntax composition over successful values; use <c>Bind</c> for fluent code.</summary>
@@ -204,13 +232,15 @@ public static class ResultExtensions
             Func<TSuccess, TCollection, TResult> resultSelector) =>
             result switch
             {
-                Success<TSuccess> success => collectionSelector(success.Value) switch
+                Result<TSuccess, TFailure>.Success(var success) => collectionSelector(success) switch
                 {
-                    Success<TCollection> collection =>
-                        new Success<TResult>(resultSelector(success.Value, collection.Value)),
-                    Failure<TFailure> failure => new Failure<TFailure>(failure.Value)
+                    Result<TCollection, TFailure>.Success(var collection) =>
+                        new Result<TResult, TFailure>.Success(resultSelector(success, collection)),
+                    Result<TCollection, TFailure>.Failure(var failure) => new Result<TResult, TFailure>.Failure(failure),
+                    null => throw NoCase.Result()
                 },
-                Failure<TFailure> failure => new Failure<TFailure>(failure.Value)
+                Result<TSuccess, TFailure>.Failure(var failure) => new Result<TResult, TFailure>.Failure(failure),
+                null => throw NoCase.Result()
             };
 
         /// <summary>Changes the failure representation while leaving successes untouched, for adapting errors between layers.</summary>
@@ -220,8 +250,9 @@ public static class ResultExtensions
         public Result<TSuccess, TOut> MapError<TOut>(Func<TFailure, TOut> mapper) =>
             result switch
             {
-                Success<TSuccess> success => new Success<TSuccess>(success.Value),
-                Failure<TFailure> failure => new Failure<TOut>(mapper(failure.Value))
+                Result<TSuccess, TFailure>.Success(var success) => new Result<TSuccess, TOut>.Success(success),
+                Result<TSuccess, TFailure>.Failure(var failure) => new Result<TSuccess, TOut>.Failure(mapper(failure)),
+                null => throw NoCase.Result()
             };
 
         /// <summary>Composes failure-side recovery or translation while ensuring a success bypasses the error handler.</summary>
@@ -232,8 +263,9 @@ public static class ResultExtensions
             Func<TFailure, Result<TSuccess, TOut>> binder) =>
             result switch
             {
-                Success<TSuccess> success => new Success<TSuccess>(success.Value),
-                Failure<TFailure> failure => binder(failure.Value)
+                Result<TSuccess, TFailure>.Success(var success) => new Result<TSuccess, TOut>.Success(success),
+                Result<TSuccess, TFailure>.Failure(var failure) => binder(failure),
+                null => throw NoCase.Result()
             };
     }
 
@@ -246,9 +278,9 @@ public static class ResultExtensions
         public Result<TOutput, TFailure> Apply(Result<TInput, TFailure> value) =>
             functions switch
             {
-                Success<Func<TInput, TOutput>> function =>
-                    value.Select(function.Value),
-                Failure<TFailure> failure => new Failure<TFailure>(failure.Value)
+                Result<Func<TInput, TOutput>, TFailure>.Success(var function) => value.Select(function),
+                Result<Func<TInput, TOutput>, TFailure>.Failure(var failure) => new Result<TOutput, TFailure>.Failure(failure),
+                null => throw NoCase.Result()
             };
     }
 }

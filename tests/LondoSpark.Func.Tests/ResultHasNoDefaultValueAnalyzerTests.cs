@@ -116,7 +116,7 @@ public sealed class ResultHasNoDefaultValueAnalyzerTests
 
                 public static Result<int, string> Failed() => Result.Failure<int, string>("invalid");
 
-                public static Result<int, string> Constructed() => new Result<int, string>(new Success<int>(1));
+                public static Result<int, string> Constructed() => new Result<int, string>(new Result<int, string>.Success(1));
             }
             """);
 
@@ -137,6 +137,81 @@ public sealed class ResultHasNoDefaultValueAnalyzerTests
             """);
 
         await Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == AnalyzerDiagnosticId)).IsFalse();
+    }
+
+    [Test]
+    public async Task AnalyzerIgnoresInitializedAndEmptyArrays()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Result<int, string>[] Implicit(Result<int, string> first, Result<int, string> second) =>
+                    new[] { first, second };
+
+                public static Result<int, string>[] Explicit(Result<int, string> first) =>
+                    new Result<int, string>[] { first };
+
+                public static Result<int, string>[] Sized(Result<int, string> first) =>
+                    new Result<int, string>[1] { first };
+
+                public static Result<int, string>[] Empty() => new Result<int, string>[0];
+            }
+            """);
+
+        await Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == AnalyzerDiagnosticId)).IsFalse();
+    }
+
+    [Test]
+    public async Task AnalyzerReportsDefaultValidation()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Validation<int, string> Value() => default;
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "'Validation.Return' or 'Validation.Failure'");
+    }
+
+    [Test]
+    public async Task AnalyzerReportsEmptyErrorResult()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static ErrorResult<int, string> Value() => new ErrorResult<int, string>();
+
+                public static ErrorResult<int, string> Wrapped() => Result.Failure<int, string>("x").AsErrorResult();
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "'ErrorResult.Return' or 'AsErrorResult()'");
+    }
+
+    [Test]
+    public async Task AnalyzerReportsUninitializedValidationArrays()
+    {
+        var diagnostics = await AnalyzeAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Validation<int, string>[] Create(int length) => new Validation<int, string>[length];
+            }
+            """);
+
+        await AssertSingleDiagnostic(diagnostics, "no zero value");
     }
 
     private static async Task AssertSingleDiagnostic(ImmutableArray<Diagnostic> diagnostics, string expectedMessage)

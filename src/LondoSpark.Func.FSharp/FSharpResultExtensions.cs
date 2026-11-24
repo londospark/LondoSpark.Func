@@ -1,4 +1,5 @@
-using LondoSpark.Func;
+using System;
+
 using Microsoft.FSharp.Core;
 
 namespace LondoSpark.Func.FSharp;
@@ -22,11 +23,14 @@ public static class FSharpResultExtensions
     /// <typeparam name="TFailure">The failure payload type.</typeparam>
     /// <param name="result">The core result to convert.</param>
     /// <returns>The equivalent F# result.</returns>
+    /// <exception cref="InvalidOperationException">The result is <see langword="default"/> and contains no case.</exception>
     public static FSharpResult<TSuccess, TFailure> ToFSharpResult<TSuccess, TFailure>(
         this Result<TSuccess, TFailure> result) =>
         result switch
         {
-            Success<TSuccess> success => FSharpResult<TSuccess, TFailure>.NewOk(success.Value),
-            Failure<TFailure> failure => FSharpResult<TSuccess, TFailure>.NewError(failure.Value)
+            Result<TSuccess, TFailure>.Success(var success) => FSharpResult<TSuccess, TFailure>.NewOk(success),
+            Result<TSuccess, TFailure>.Failure(var failure) => FSharpResult<TSuccess, TFailure>.NewError(failure),
+            null => throw new InvalidOperationException(
+                "A default result contains no case. Construct results with Result.Return or Result.Failure.")
         };
 }

@@ -6,6 +6,7 @@ namespace LondoSpark.Func;
 /// <typeparam name="TSuccess">The success type preserved during error-focused binding.</typeparam>
 /// <typeparam name="TFailure">The current failure type.</typeparam>
 /// <param name="Value">The result represented by this wrapper.</param>
+/// <remarks>Like <see cref="Result{TSuccess, TFailure}"/>, a <see langword="default"/> wrapper contains no case and its operations throw.</remarks>
 public readonly record struct ErrorResult<TSuccess, TFailure>(Result<TSuccess, TFailure> Value);
 
 /// <summary>Starts a failure-focused computation with an error value.</summary>
@@ -53,9 +54,10 @@ public static class ErrorResultExtensions
             Func<TFailure, ErrorResult<TSuccess, TOut>> binder) =>
             result.Value switch
             {
-                Success<TSuccess> success =>
-                    Result.Return<TSuccess, TOut>(success.Value).AsErrorResult(),
-                Failure<TFailure> failure => binder(failure.Value)
+                Result<TSuccess, TFailure>.Success(var success) =>
+                    Result.Return<TSuccess, TOut>(success).AsErrorResult(),
+                Result<TSuccess, TFailure>.Failure(var failure) => binder(failure),
+                null => throw NoCase.Result()
             };
 
         /// <summary>Provides query-syntax composition over failures; use <c>BindError</c> for fluent code.</summary>
@@ -77,16 +79,18 @@ public static class ErrorResultExtensions
             Func<TFailure, TCollection, TResult> resultSelector) =>
             result.Value switch
             {
-                Success<TSuccess> outerSuccess =>
-                    Result.Return<TSuccess, TResult>(outerSuccess.Value).AsErrorResult(),
-                Failure<TFailure> failure => collectionSelector(failure.Value).Value switch
+                Result<TSuccess, TFailure>.Success(var outerSuccess) =>
+                    Result.Return<TSuccess, TResult>(outerSuccess).AsErrorResult(),
+                Result<TSuccess, TFailure>.Failure(var failure) => collectionSelector(failure).Value switch
                 {
-                    Success<TSuccess> innerSuccess =>
-                        Result.Return<TSuccess, TResult>(innerSuccess.Value).AsErrorResult(),
-                    Failure<TCollection> collection =>
+                    Result<TSuccess, TCollection>.Success(var innerSuccess) =>
+                        Result.Return<TSuccess, TResult>(innerSuccess).AsErrorResult(),
+                    Result<TSuccess, TCollection>.Failure(var collection) =>
                         ErrorResult.Return<TSuccess, TResult>(
-                            resultSelector(failure.Value, collection.Value))
-                }
+                            resultSelector(failure, collection)),
+                    null => throw NoCase.Result()
+                },
+                null => throw NoCase.Result()
             };
     }
 
@@ -100,10 +104,11 @@ public static class ErrorResultExtensions
             ErrorResult<TSuccess, TInput> value) =>
             functions.Value switch
             {
-                Success<TSuccess> success =>
-                    Result.Return<TSuccess, TOutput>(success.Value).AsErrorResult(),
-                Failure<Func<TInput, TOutput>> function =>
-                    value.Select(function.Value)
+                Result<TSuccess, Func<TInput, TOutput>>.Success(var success) =>
+                    Result.Return<TSuccess, TOutput>(success).AsErrorResult(),
+                Result<TSuccess, Func<TInput, TOutput>>.Failure(var function) =>
+                    value.Select(function),
+                null => throw NoCase.Result()
             };
     }
 }

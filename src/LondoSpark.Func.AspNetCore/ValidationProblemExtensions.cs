@@ -18,7 +18,7 @@ public static class ValidationProblemExtensions
     /// <param name="errors">The validation errors, in the order they were accumulated.</param>
     /// <returns>
     /// A <see cref="ValidationProblem"/> whose <c>errors</c> object keys messages by field,
-    /// preserving their order within each field.
+    /// preserving their order within each field. An error without a field is keyed by the empty string.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="errors"/> is <see langword="null"/>.</exception>
     public static ValidationProblem ToValidationProblem(this NonEmptyList<ValidationError> errors)
@@ -38,13 +38,16 @@ public static class ValidationProblemExtensions
         {
             var projected = projectError(error);
 
-            if (!grouped.TryGetValue(projected.Field, out var messages))
+            // A default ValidationError has no field; key it as a model-level error, as MVC does, rather than throw.
+            var field = projected.Field ?? string.Empty;
+
+            if (!grouped.TryGetValue(field, out var messages))
             {
                 messages = [];
-                grouped.Add(projected.Field, messages);
+                grouped.Add(field, messages);
             }
 
-            messages.Add(projected.Message);
+            messages.Add(projected.Message ?? string.Empty);
         }
 
         var problem = new Dictionary<string, string[]>(grouped.Count, StringComparer.Ordinal);

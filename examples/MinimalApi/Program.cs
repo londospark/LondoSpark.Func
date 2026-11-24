@@ -6,7 +6,6 @@ using LondoSpark.Func.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.Extensions.Hosting;
 
 // Option describes not-found without a nullable reference, Validation gathers every
 // field problem in a request, and ToResult hands those errors to a Result pipeline.
@@ -24,17 +23,19 @@ var directory = new CustomerDirectory();
 
 app.MapGet("/customers", Ok<Customer[]> () => TypedResults.Ok(directory.All.ToArray()));
 
-app.MapGet("/customers/{id:int}", IResult (int id) =>
+app.MapGet("/customers/{id:int}", (int id) =>
     directory.Find(id).ToHttpResult());
 
 // Validate, then register, as one pipeline: Bind stops at the first failure and the
-// single switch maps the domain error, naming no generic case types.
-app.MapPost("/customers", IResult (CustomerRequest request) =>
+// single switch maps the domain error, naming no generic case types. The failure lambda
+// returns IResult because its branches produce different result types; the success
+// side stays typed, so OpenAPI still sees the 201 response.
+app.MapPost("/customers", (CustomerRequest request) =>
     CustomerValidation.Validate(request)
         .Bind(directory.Register)
         .ToHttpResult(
             static customer => TypedResults.Created($"/customers/{customer.Id}", customer),
-            static error => error switch
+            static IResult (error) => error switch
             {
                 InvalidRequest invalid => invalid.Errors.ToValidationProblem(),
                 AlreadyRegistered taken => TypedResults.Problem(

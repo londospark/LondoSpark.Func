@@ -13,9 +13,9 @@ using LondoSpark.Func.Json;
 var options = new JsonSerializerOptions { WriteIndented = true };
 options.AddLondoSparkFuncConverters();
 
-Option<int> some = Option.Return(42);
-Option<int> none = Option.Empty<int>();
-Option<string?> someNull = Option.Return<string?>(null);
+var some = Option.Return(42);
+var none = Option.Empty<int>();
+var someNull = Option.Return<string?>(null);
 
 Console.WriteLine($"some:      {JsonSerializer.Serialize(some, options)}");
 Console.WriteLine($"none:      {JsonSerializer.Serialize(none, options)}");
@@ -26,8 +26,8 @@ var someRoundTrip = JsonSerializer.Deserialize<Option<int>>(someJson, options);
 Console.WriteLine($"round-trip: {someRoundTrip}");
 
 var customer = new Customer(1, "Ada", "ada@example.com", 36);
-Result<Customer, string> success = Result.Return<Customer, string>(customer);
-Result<Customer, string> failure = Result.Failure<Customer, string>("A customer with email 'ada@example.com' already exists.");
+var success = Result.Return<Customer, string>(customer);
+var failure = Result.Failure<Customer, string>("A customer with email 'ada@example.com' already exists.");
 
 Console.WriteLine($"success:   {JsonSerializer.Serialize(success, options)}");
 Console.WriteLine($"failure:   {JsonSerializer.Serialize(failure, options)}");

@@ -10,6 +10,7 @@
     <Project Path="src/LondoSpark.Func/LondoSpark.Func.csproj" />
     <Project Path="src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj" />
     <Project Path="src/LondoSpark.Func.AspNetCore/LondoSpark.Func.AspNetCore.csproj" />
+    <Project Path="src/LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj" />
     <Project Path="src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
     <Project Path="src/LondoSpark.Func.Json/LondoSpark.Func.Json.csproj" />
   </Folder>

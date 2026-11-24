@@ -1,9 +1,10 @@
 using System.Threading.Tasks;
 
-using LondoSpark.Func;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
+using static LondoSpark.Func.Option<int>;
+using static LondoSpark.Func.Result<int, LondoSpark.Func.Unit>;
 
 namespace LondoSpark.Func.Tests;
 
@@ -12,15 +13,15 @@ public sealed class OptionResultConversionsTests
     [Test]
     public async Task OptionAndUnitResultConvertBothWays()
     {
-        Option<string> some = "value".ToOption();
-        Option<string> none = ((string?)null).ToOption();
+        var some = "value".ToOption();
+        var none = ((string?)null).ToOption();
 
-        Result<string, Unit> successResult = some.ToResult();
-        Result<string, Unit> failureResult = none.ToResult();
+        var successResult = some.ToResult();
+        var failureResult = none.ToResult();
 
-        await Assert.That(successResult.ToOption() is Some<string> { Value: "value" }).IsTrue();
-        await Assert.That(successResult is Success<string> { Value: "value" }).IsTrue();
-        await Assert.That(failureResult is Failure<Unit> { Value: var unit } && unit == Unit.Value).IsTrue();
+        await Assert.That(successResult.ToOption() is Option<string>.Some("value")).IsTrue();
+        await Assert.That(successResult is Result<string, Unit>.Success("value")).IsTrue();
+        await Assert.That(failureResult is Result<string, Unit>.Failure(var unit) && unit == Unit.Value).IsTrue();
         await Assert.That(failureResult.ToOption() is None).IsTrue();
         await Assert.That(Unit.Value).IsEqualTo(default(Unit));
     }
@@ -28,26 +29,26 @@ public sealed class OptionResultConversionsTests
     [Test]
     public async Task OptionSomeAndNoneConvertToCorrespondingResultCases()
     {
-        Option<int> some = Option.Return(21);
-        Option<int> none = Option.Empty<int>();
+        var some = Option.Return(21);
+        var none = Option.Empty<int>();
 
-        Result<int, Unit> someResult = some.ToResult();
-        Result<int, Unit> noneResult = none.ToResult();
+        var someResult = some.ToResult();
+        var noneResult = none.ToResult();
 
-        await Assert.That(someResult is Success<int> { Value: 21 }).IsTrue();
-        await Assert.That(noneResult is Failure<Unit> { Value: var unit } && unit == Unit.Value).IsTrue();
+        await Assert.That(someResult is Success(21)).IsTrue();
+        await Assert.That(noneResult is Failure(var unit) && unit == Unit.Value).IsTrue();
     }
 
     [Test]
     public async Task ResultSuccessAndFailureConvertToCorrespondingOptionCases()
     {
-        Result<int, Unit> success = Result.Return<int, Unit>(21);
-        Result<int, Unit> failure = Result.Failure<int, Unit>(Unit.Value);
+        var success = Result.Return<int, Unit>(21);
+        var failure = Result.Failure<int, Unit>(Unit.Value);
 
-        Option<int> successOption = success.ToOption();
-        Option<int> failureOption = failure.ToOption();
+        var successOption = success.ToOption();
+        var failureOption = failure.ToOption();
 
-        await Assert.That(successOption is Some<int> { Value: 21 }).IsTrue();
+        await Assert.That(successOption is Some(21)).IsTrue();
         await Assert.That(failureOption is None).IsTrue();
     }
 }

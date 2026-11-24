@@ -26,12 +26,74 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 - `NonEmptyList<T>.ToSeparatedString(separator)` for turning accumulated errors into
   one message.
 - `Result<TSuccess, TFailure>.ToExitCode()` maps a result to `0` or `1` for CLIs.
+- `Option.Some(value)` and `Option.None<T>()`, reading as the cases they create, alongside
+  `Option.Return` and `Option.Empty`.
+- Code fixes that import a union's cases: typing `Success(var c)` without the import
+  offers `using static LondoSpark.Func.Result<...>;`, or the qualified name when an
+  import would clash. `LSF0002` suggests the import for cases written in full, and its
+  fix shortens them across the file. The fixes ship in a new
+  `LondoSpark.Func.CodeFixes` assembly inside the core package.
+- `LondoSpark.Func.Json`: `AddOptionConverter<T>()` and
+  `AddResultConverter<TSuccess, TFailure>()` register closed converters without
+  reflection, for Native AOT and trimming.
+- `LondoSpark.Func.FSharp`: `ToOption()` and `ToFSharpValueOption()` convert to and
+  from F# `voption` without allocating.
+- Allocation tests that fail if `Option`, `Result`, or `Validation` composition, or
+  `NonEmptyList` enumeration, starts allocating; benchmarks for `Validation`,
+  `NonEmptyList.Append`, and the JSON converters.
 
 ### Changed
+
+- **Breaking:** union cases are nested types (`Option<T>.Some`,
+  `Result<TSuccess, TFailure>.Success` and `.Failure`, `Validation<TSuccess,
+  TError>.Success` and `.Failure`), replacing the top-level generic `Some<T>`,
+  `Success<T>`, and `Failure<T>`. With
+  `using static LondoSpark.Func.Result<Customer, CustomerError>;` a switch reads
+  `Success(var customer) => ..., Failure(var error) => ...`: exhaustive, with no type
+  arguments and no null arm, and `new Success(customer)` converts to the result.
+  `Result<T, T>` keeps its cases distinct. `Validation`'s failure case exposes its
+  list as `Errors`. `None` is unchanged and shared by every option.
 
 - The examples model a registration failure as one `CustomerError` union, so the
   endpoint and the CLI both compose `Validate(...).Bind(Register)` as a pipeline and
   map the domain error once, instead of nesting a switch per union.
+- The mapping helpers cover only the values the constructors produce, so
+  `Result.ToExitCode()`, `ToHttpResult(...)`, and `Validation<...>.ToResult()` no longer
+  map `default` to a case. A hand-written zero value fails with an
+  `InvalidOperationException` naming the constructors instead of being mapped,
+  matching `LSF0001` treating zero-initialisation as an error. Every operation on
+  `Result`, `Validation`, and `ErrorResult` now throws that exception for a zero
+  value, rather than an opaque `SwitchExpressionException`.
+- **Breaking:** `Validation<TSuccess, TValidationError>` is a hand-written struct
+  union that stores its case inline, so constructing, selecting, and applying a
+  valid value no longer boxes. It now has `HasValue`, a `Value` that throws for a zero
+  value, `==`/`!=`, and `ToString()` (`Success(1)`, `Failure(a, b)`). Failures
+  compare their error list by reference, as before.
+- **Breaking:** `NonEmptyList<T>` and `Validation.Failure` take
+  `params ReadOnlySpan<T>`, so passing several errors no longer allocates a
+  temporary array. `NonEmptyList<T>.Append` reuses spare capacity, so accumulating
+  N errors through `Apply` is amortised linear instead of quadratic. Enumeration uses
+  a struct enumerator and no longer allocates; `AsSpan()` exposes the items.
+- **Breaking:** every `ToHttpResult` overload returns a typed
+  `Results<TSuccess, TFailure>` instead of `IResult`, so minimal-API endpoints
+  publish both responses to OpenAPI. Callbacks are generic over their result type;
+  a callback whose branches return different types needs an explicit `IResult`
+  return type.
+- **Breaking:** `AddLondoSparkFuncConverters` and the converter factories are marked
+  `RequiresDynamicCode` and `RequiresUnreferencedCode`. The JSON converters resolve
+  payload type metadata once per serializer configuration instead of per call, and
+  their property names follow `PropertyNamingPolicy` and
+  `PropertyNameCaseInsensitive`.
+- `LSF0001` no longer reports arrays created with an initializer or with length
+  zero, and now also reports zero-initialised `Validation` and `ErrorResult` values.
+- `Option<T>.Value` returns a shared `None` instance instead of boxing a new one,
+  and `Some(null)` renders as `Some(null)` rather than `Some()`.
+- A `ValidationError` without a field is grouped under the empty-string key, as
+  MVC does for model-level errors, instead of throwing.
+- The core, JSON, and ASP.NET Core packages set `IsAotCompatible`.
+- Union case payloads are captured by the pattern (`Success(var value)`) rather
+  than read from the wrapper, and a case that is only propagated is returned as
+  itself instead of being unwrapped and rebuilt.
 
 ## [0.2.0-prealpha.2] - 2026-11-24
 
