@@ -10,6 +10,8 @@ The project is early in development; its API and package layout may change.
 - `src/LondoSpark.Func` — core `Option<T>` and `Result<TSuccess, TFailure>` types,
   LINQ query operators, and conversions between `Option<T>` and `Result<T, Unit>`.
 - `src/LondoSpark.Func.Analyzers` — Roslyn analyzers, bundled into the core package.
+- `src/LondoSpark.Func.Json` — `System.Text.Json` converters for `Option<T>` and
+  `Result<TSuccess, TFailure>`.
 - `src/LondoSpark.Func.FSharp` — typed conversions to and from F# `option` and
   `Result`, including values whose payload types are nullable.
 - `tests/LondoSpark.Func.Tests` — TUnit tests and FsCheck monad-law properties.
@@ -67,7 +69,18 @@ payload.
 
 `Option<TSome>` and `Result<TSuccess, TFailure>` compare structurally: values are
 equal when they hold the same case with equal payloads. They implement
-`IEquatable<T>` and expose `==` and `!=`.
+`IEquatable<T>` and expose `==` and `!=`. `ToString()` renders the active case
+(`Some(42)`, `None`, `Success(42)`, `Failure(error)`), so log output is readable.
+
+`LondoSpark.Func.Json` supplies the converters when these values cross a JSON
+boundary: an option is `null` for `None` or `{"some": value}` for `Some`, and a
+result is `{"success": value}` or `{"failure": error}`. The object wrapper keeps
+`Some(null)` distinct from `None`.
+
+```csharp
+var options = new JsonSerializerOptions { WriteIndented = true };
+options.AddLondoSparkFuncConverters();
+```
 
 The local BenchmarkDotNet project is deliberately outside the solution and is
 not run by CI. It uses BenchmarkDotNet 0.16.0-preview.2 for .NET 11 support.

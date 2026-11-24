@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Version>0.2.0-prealpha.1</Version>
+    <PackageId>LondoSpark.Func.Json</PackageId>
+    <AssemblyName>LondoSpark.Func.Json</AssemblyName>
+    <RootNamespace>LondoSpark.Func.Json</RootNamespace>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Authors>LondoSpark</Authors>
+    <Description>System.Text.Json converters for LondoSpark.Func option and result values.</Description>
+    <PackageTags>functional;option;result;json;serialization</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/londospark/LondoSpark.Func</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/londospark/LondoSpark.Func</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../LondoSpark.Func/LondoSpark.Func.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+</Project>

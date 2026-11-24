@@ -2,19 +2,16 @@ using System;
 using System.Text.Json;
 
 using Examples.DomainModeling;
-using Examples.JsonSerialization;
 using LondoSpark.Func;
+using LondoSpark.Func.Json;
 
-// System.Text.Json does not know the union cases, so an option or result needs a
-// converter before it can cross a process or network boundary. This example shows
-// the shape a library-provided converter would need.
+// System.Text.Json does not know the union cases, so the LondoSpark.Func.Json package
+// supplies converters. Registering the two factories covers every closed generic type.
 //
 //   dotnet run --project examples/JsonSerialization
 
 var options = new JsonSerializerOptions { WriteIndented = true };
-options.Converters.Add(new OptionJsonConverter<int>());
-options.Converters.Add(new OptionJsonConverter<string?>());
-options.Converters.Add(new ResultJsonConverter<Customer, string>());
+options.AddLondoSparkFuncConverters();
 
 Option<int> some = Option.Return(42);
 Option<int> none = Option.Empty<int>();
@@ -34,6 +31,7 @@ Result<Customer, string> failure = Result.Failure<Customer, string>("A customer 
 
 Console.WriteLine($"success:   {JsonSerializer.Serialize(success, options)}");
 Console.WriteLine($"failure:   {JsonSerializer.Serialize(failure, options)}");
+
 var failureJson = JsonSerializer.Serialize(failure, options);
 var failureRoundTrip = JsonSerializer.Deserialize<Result<Customer, string>>(failureJson, options);
 Console.WriteLine($"round-trip: {JsonSerializer.Serialize(failureRoundTrip, options)}");

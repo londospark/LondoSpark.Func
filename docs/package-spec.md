@@ -56,6 +56,14 @@ project file, following the same pattern as `TUnit.Core`. Property defaults live
 the `.props` file and the `Using` item in the `.targets` file, because item
 conditions are evaluated after every property.
 
+### `LondoSpark.Func.Json`
+
+Serialization adapters for `System.Text.Json`, which the .NET 11 shared framework
+already provides, so the package adds no dependency. Converters are streaming: they
+read the payload directly from `Utf8JsonReader` and write with cached
+`JsonEncodedText` property names, avoiding a document allocation. Converter
+factories let consumers register once for every closed generic type.
+
 ### `LondoSpark.Func.FSharp`
 
 An optional interop package referencing FSharp.Core. It supplies explicit conversions

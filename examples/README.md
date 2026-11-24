@@ -8,7 +8,7 @@ would. They build with the rest of the solution, so they cannot drift from the A
 | [`DomainModeling`](DomainModeling) | class library | `Validation` accumulating errors, `Option` for lookup, `Result` for expected failure |
 | [`ConsolePipeline`](ConsolePipeline) | console app | argument parsing with `ToOption`, `Option`/`Result` composition, `ErrorResult` error enrichment, exit codes |
 | [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | `Option` → 404, `Result` → 409, `Validation` → 400 problem details |
-| [`JsonSerialization`](JsonSerialization) | console app | `System.Text.Json` converters that round-trip `Option<T>` and `Result<TSuccess, TFailure>` |
+| [`JsonSerialization`](JsonSerialization) | console app | `LondoSpark.Func.Json` converters that round-trip `Option<T>` and `Result<TSuccess, TFailure>` |
 | [`FSharpPipeline`](FSharpPipeline) | F# console app | lossless F# `option`/`Result` round-trips through the core types |
 
 ## Running
@@ -25,9 +25,6 @@ dotnet run --project examples/FSharpPipeline
 These projects deliberately do their own glue where the library has no helper yet,
 so the gaps are visible:
 
-- **JSON converters.** `JsonSerialization` carries its own `OptionJsonConverter<T>`
-  and `ResultJsonConverter<TSuccess, TFailure>`. These want to live in a
-  `LondoSpark.Func.Json` package with a documented wire shape.
 - **ASP.NET Core results.** `MinimalApi` maps unions to `IResult` by hand. A
   `LondoSpark.Func.AspNetCore` package could map `Option` → 404, `Result` → a chosen
   status, and `Validation` → `ValidationProblem` consistently.
@@ -35,9 +32,6 @@ so the gaps are visible:
   hand; a small adapter would remove that boilerplate.
 - **Validation errors as a message.** Turning `NonEmptyList<string>` into a single
   user-facing sentence is common enough to deserve a helper.
-- **Readable `ToString`.** Neither union overrides `ToString`, so logging or
-  interpolating one prints the type name. A `ToString` that renders the active case
-  would make console and log output far more useful.
 - **Validation keyed by field.** `ValidationProblem` wants a field-to-messages map,
   but `Validation<TSuccess, string>` only carries messages. A keyed failure type or a
   helper would be needed for field-level errors.

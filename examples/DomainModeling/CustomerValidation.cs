@@ -23,7 +23,7 @@ public static class CustomerValidation
             : Validation.Return<string, string>(name);
 
     private static Validation<string, string> RequiredEmail(string? email) =>
-        email is null || !email.Contains('@')
+        email is null || !email.Contains('@', StringComparison.Ordinal)
             ? Validation.Failure<string, string>("A valid email address is required.")
             : Validation.Return<string, string>(email);
 

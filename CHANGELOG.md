@@ -10,9 +10,16 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ### Added
 
-- `examples/`: a domain library, a console pipeline, an ASP.NET Core minimal API,
-  `System.Text.Json` converters, and an F# consumer. They build with the solution and
-  record the helpers they had to write themselves.
+- `LondoSpark.Func.Json`: `System.Text.Json` converters for `Option<TSome>` and
+  `Result<TSuccess, TFailure>`, with converter factories so one registration covers
+  every closed type. `Option` is `null` for `None` and `{"some": value}` for `Some`;
+  a result is `{"success": value}` or `{"failure": error}`. Reading is streaming and
+  allocates no document.
+- `ToString()` on `Option<TSome>` and `Result<TSuccess, TFailure>` renders the active
+  case (`Some(42)`, `None`, `Success(42)`, `Failure(error)`).
+- `examples/`: a domain library, a console pipeline, an ASP.NET Core minimal API, a
+  JSON round-trip, and an F# consumer. They build with the solution and record the
+  helpers they had to write themselves.
 - `Option<TSome>` and `Result<TSuccess, TFailure>` implement `IEquatable<T>` and expose
   `==`/`!=`. Equality compares the active case and its payload, so comparing two
   options or results no longer falls back to reflection-based `ValueType.Equals`.
