@@ -27,10 +27,19 @@ app.MapGet("/customers", Ok<Customer[]> () => TypedResults.Ok(directory.All.ToAr
 app.MapGet("/customers/{id:int}", IResult (int id) =>
     directory.Find(id).ToHttpResult());
 
+// ToHttpResult is the shorthand when a value maps in one call. When the flow has
+// steps, a switch expression reads better and proves itself exhaustive: adding a
+// case to either union stops this compiling until the new case is handled.
 app.MapPost("/customers", IResult (CustomerRequest request) =>
-    CustomerValidation.Validate(request).ToHttpResult(
-        validated => directory.Register(validated).ToHttpResult(
-            static customer => TypedResults.Created($"/customers/{customer.Id}", customer),
-            static error => TypedResults.Conflict(error.Message))));
+    CustomerValidation.Validate(request) switch
+    {
+        Success<NewCustomer> validated => directory.Register(validated.Value) switch
+        {
+            Success<Customer> customer =>
+                TypedResults.Created($"/customers/{customer.Value.Id}", customer.Value),
+            Failure<ValidationError> failure => TypedResults.Conflict(failure.Value.Message)
+        },
+        Failure<NonEmptyList<ValidationError>> errors => errors.Value.ToValidationProblem()
+    });
 
 app.Run();

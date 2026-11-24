@@ -62,8 +62,10 @@ conditions are evaluated after every property.
 Maps unions to HTTP results through a single `ToHttpResult` verb: `Option` to
 `200`/`404`, `Result` to `200` or the caller's failure result, and `Validation` to
 `200` or a field-keyed `400` problem. Any validation error type works by projecting
-it onto `ValidationError`, which needs no projection. Failure paths allocate the
-problem payload only; success paths just wrap the value.
+it onto `ValidationError`, which needs no projection, and
+`NonEmptyList<ValidationError>.ToValidationProblem()` builds that `400` payload for
+flows that switch on the cases themselves. Failure paths allocate the problem payload
+only; success paths just wrap the value.
 
 ### `LondoSpark.Func.Json`
 

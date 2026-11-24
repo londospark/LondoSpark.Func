@@ -10,8 +10,11 @@ namespace LondoSpark.Func.AspNetCore;
 /// <remarks>
 /// The overload decides the mapping: an option is <c>200</c> or <c>404</c>, a result is
 /// <c>200</c> or the caller's failure result, and a validation is <c>200</c> or a
-/// field-keyed <c>400</c>. Success paths only wrap the value in the typed result;
-/// allocations happen on the failure path where the problem payload is built.
+/// field-keyed <c>400</c>. These shorthands suit a flow that maps in one call; a flow
+/// of several steps reads better as a switch expression, with
+/// <see cref="ValidationProblemExtensions.ToValidationProblem"/> building the failure
+/// case. Success paths only wrap the value in the typed result; allocations happen on
+/// the failure path where the problem payload is built.
 /// </remarks>
 public static class HttpResultExtensions
 {
@@ -92,7 +95,8 @@ public static class HttpResultExtensions
         {
             Success<TSuccess> success => onSuccess(success.Value),
             Failure<NonEmptyList<TValidationError>> errors =>
-                TypedResults.ValidationProblem(GroupByField(errors.Value, projectError)),
+                TypedResults.ValidationProblem(
+                    ValidationProblemExtensions.GroupByField(errors.Value, projectError)),
             _ => throw new InvalidOperationException("A default validation contains no case to map.")
         };
 
@@ -112,33 +116,4 @@ public static class HttpResultExtensions
         this Validation<TSuccess, ValidationError> validation,
         Func<TSuccess, IResult> onSuccess) =>
         validation.ToHttpResult(onSuccess, static error => error);
-
-    private static Dictionary<string, string[]> GroupByField<TValidationError>(
-        NonEmptyList<TValidationError> errors,
-        Func<TValidationError, ValidationError> projectError)
-    {
-        var grouped = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-
-        foreach (var error in errors)
-        {
-            var projected = projectError(error);
-
-            if (!grouped.TryGetValue(projected.Field, out var messages))
-            {
-                messages = [];
-                grouped.Add(projected.Field, messages);
-            }
-
-            messages.Add(projected.Message);
-        }
-
-        var problem = new Dictionary<string, string[]>(grouped.Count, StringComparer.Ordinal);
-
-        foreach (var pair in grouped)
-        {
-            problem.Add(pair.Key, [.. pair.Value]);
-        }
-
-        return problem;
-    }
 }

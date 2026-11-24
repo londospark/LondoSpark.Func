@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 using LondoSpark.Func;
@@ -85,6 +86,30 @@ public sealed class AspNetCoreResultTests
             static value => TypedResults.Created($"/items/{value}", value));
 
         await Assert.That(result is Created<int> { Value: 7 }).IsTrue();
+    }
+
+    [Test]
+    public async Task NonEmptyListBuildsTheFieldKeyedProblem()
+    {
+        var errors = new NonEmptyList<ValidationError>(
+            new ValidationError("name", "Name is required."),
+            new ValidationError("email", "A valid email address is required."),
+            new ValidationError("name", "Name is too long."));
+
+        var problem = errors.ToValidationProblem();
+
+        await Assert.That(problem.ProblemDetails.Errors["name"].Length).IsEqualTo(2);
+        await Assert.That(problem.ProblemDetails.Errors["name"][0]).IsEqualTo("Name is required.");
+        await Assert.That(problem.ProblemDetails.Errors["name"][1]).IsEqualTo("Name is too long.");
+        await Assert.That(problem.ProblemDetails.Errors["email"][0]).IsEqualTo("A valid email address is required.");
+        await Assert.That(problem.ProblemDetails.Status).IsEqualTo(StatusCodes.Status400BadRequest);
+    }
+
+    [Test]
+    public async Task NonEmptyListRejectsNullWhenBuildingAProblem()
+    {
+        await Assert.That(() => ((NonEmptyList<ValidationError>)null!).ToValidationProblem())
+            .Throws<ArgumentNullException>();
     }
 
     [Test]

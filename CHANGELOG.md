@@ -16,7 +16,10 @@ Because it is pre-1.0, a minor version may contain breaking changes.
   `Option` becomes `200`/`404`, `Result` becomes `200` or the result your failure
   handler returns, and `Validation` becomes `200` or a field-keyed `400`. Any
   validation error type works by projecting it onto `ValidationError`, which needs no
-  projection.
+  projection. These are shorthands: a flow with steps reads better as a switch
+  expression, which the compiler keeps exhaustive.
+- `NonEmptyList<ValidationError>.ToValidationProblem()` builds the field-keyed `400`
+  payload on its own, so a switch expression can handle the failure case directly.
 - `NonEmptyList<T>.ToSeparatedString(separator)` for turning accumulated errors into
   one message.
 - `Result<TSuccess, TFailure>.ToExitCode()` maps a result to `0` or `1` for CLIs.

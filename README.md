@@ -92,17 +92,26 @@ form expects:
 app.MapGet("/customers/{id:int}", (int id) => directory.Find(id).ToHttpResult());
 
 app.MapPost("/customers", (CustomerRequest request) =>
-    CustomerValidation.Validate(request).ToHttpResult(
-        validated => directory.Register(validated).ToHttpResult(
-            customer => TypedResults.Created($"/customers/{customer.Id}", customer),
-            error => TypedResults.Conflict(error.Message))));
+    CustomerValidation.Validate(request) switch
+    {
+        Success<NewCustomer> validated => directory.Register(validated.Value) switch
+        {
+            Success<Customer> customer =>
+                TypedResults.Created($"/customers/{customer.Value.Id}", customer.Value),
+            Failure<ValidationError> failure => TypedResults.Conflict(failure.Value.Message)
+        },
+        Failure<NonEmptyList<ValidationError>> errors => errors.Value.ToValidationProblem()
+    });
 ```
 
-One `ToHttpResult` verb covers every union; the overload decides the mapping. An
-option is `200` or `404`, a result is `200` or the result your failure handler
-returns, and a validation is `200` or a field-keyed `400`. Any validation error
-type works by projecting it onto `ValidationError`;
-`Validation<TSuccess, ValidationError>` needs no projection.
+`ToHttpResult` is the shorthand when a value maps in one call: an option is `200`
+or `404`, a result is `200` or the result your failure handler returns, and a
+validation is `200` or a field-keyed `400`. When the flow has steps of its own, a
+switch expression reads better and the compiler keeps it exhaustive. Any
+validation error type works by projecting it onto `ValidationError`;
+`Validation<TSuccess, ValidationError>` needs no projection, and
+`NonEmptyList<ValidationError>.ToValidationProblem()` builds the `400` payload for a
+case handled on its own.
 `NonEmptyList<T>.ToSeparatedString` joins messages, and `Result.ToExitCode()` maps a
 CLI result to a process exit code.
 
@@ -312,8 +321,10 @@ public readonly record struct ProductNotFound;
 ```
 
 This keeps `Result` independent of ASP.NET Core and makes the domain-to-HTTP
-policy visible. An optional web adapter can later reduce this mapping boilerplate
-without imposing one error policy on every application.
+policy visible. `LondoSpark.Func.AspNetCore` supplies the shorthand for the shapes
+every API repeats — `ToHttpResult()` is an option's `200`/`404`, a result's `200`
+plus your failure handler, and a validation's `200`/field-keyed `400` — without
+choosing an error policy for you.
 
 ### Blazor components
 
