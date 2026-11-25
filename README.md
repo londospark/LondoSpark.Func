@@ -10,6 +10,8 @@ The project is early in development; its API and package layout may change.
 - `src/LondoSpark.Func` — core `Option<T>` and `Result<TSuccess, TFailure>` types,
   LINQ query operators, and conversions between `Option<T>` and `Result<T, Unit>`.
 - `src/LondoSpark.Func.Analyzers` — Roslyn analyzers, bundled into the core package.
+- `src/LondoSpark.Func.Generators` — the instruction-set source generator for
+  `Program<TOp, T>`, bundled into the core package.
 - `src/LondoSpark.Func.Json` — `System.Text.Json` converters for `Option<T>` and
   `Result<TSuccess, TFailure>`.
 - `src/LondoSpark.Func.AspNetCore` — maps options, results, and validations to HTTP
@@ -71,15 +73,12 @@ var message = registration switch
     Success(var customer) => $"Registered {customer.Id}",
     Failure(var error) => error.Describe()
 };
-
-Result<Customer, CustomerError> Register(NewCustomer candidate) =>
-    IsTaken(candidate.Email)
-        ? new Failure(new AlreadyRegistered(candidate.Email))
-        : new Success(Add(candidate));
 ```
 
-The switch stays exhaustive with no `default` arm, and the cases convert
-implicitly, so `new Success(...)` returns as a `Result`. Type arguments in a
+The switch stays exhaustive with no `default` arm and no `null` arm. Build values
+with the [prelude](#prelude) (`success(customer)`, `failure(error)`, `some(x)`,
+`none`); the cases also convert implicitly, so `new Success(...)` works where you
+prefer it. Type arguments in a
 `using static` directive are namespace-qualified, because one using directive
 cannot see another's imports.
 
@@ -96,15 +95,70 @@ FoundCustomer.Some(var customer) => ...
 Generic code, where the type arguments are type parameters, names the union:
 `Result<T, string>.Success(var value)`.
 
-You rarely type the import yourself. When a case name is not in scope — you write
+You rarely type the import yourself. When a case is not in scope — you write
 `Success(var c)` in a switch over a `Result<Customer, CustomerError>`, or
-`return new Success(c);` from a method returning one — the IDE offers
+`return taken ? new Failure(e) : new Success(c);` from a method returning one — the IDE offers
 **Add `using static LondoSpark.Func.Result<Shop.Customer, Shop.CustomerError>;`**.
 If that import would clash with one already in the file, or the union is over type
 parameters, it offers to qualify the name in place instead. Cases already written
 in full, `Result<Customer, CustomerError>.Success(...)`, are reported as `LSF0002`
-suggestions whose fix adds the import and shortens every case of that union in the
-file.
+suggestions whose fix adds the import and shortens every one of that union's cases
+in the file.
+
+### Prelude
+
+Build values with the prelude rather than constructors; it reads like
+LanguageExt:
+
+```csharp
+using static LondoSpark.Func.Prelude;
+
+Option<Customer> Find(int id) =>
+    customers.TryGetValue(id, out var customer) ? some(customer) : none;
+
+Result<Customer, CustomerError> Register(NewCustomer candidate) =>
+    IsTaken(candidate.Email)
+        ? failure<CustomerError>(new AlreadyRegistered(candidate.Email))
+        : success(Add(candidate));
+```
+
+`success` and `failure` know only one side of the result, so they return a small
+struct that converts implicitly to whichever `Result` or `Validation` the context
+expects; a `failure(error)` becomes a validation with that one error. Nothing is
+allocated. `none` is the shared `None`, which converts to an absent option of any
+type, and every option's boxed `Value` for `None` is the same object. Set
+`<LondoSparkFuncPrelude>true</LondoSparkFuncPrelude>` in a project file to import
+the prelude in every file, and typing `some`, `none`, `success`, or `failure`
+without it offers **Add `using static LondoSpark.Func.Prelude;`**. The prelude
+builds values; matching still names the cases, `Success(var c)`.
+
+C# does not infer a generic method's type arguments through implicit conversions,
+so a lambda handed to `Bind` cannot work out its result type from `success` and
+`failure` alone. Name the lambda's return type, or pass a method:
+
+```csharp
+source.Bind(Result<int, string> (value) => value > 0 ? success(value) : failure("negative"));
+source.Bind(Validate);   // static Result<int, string> Validate(int value) => ...
+```
+
+The same holds for `SelectMany` and query syntax, which compiles to it. A `from`
+clause over a method that returns a `Result` works; one written directly as
+`success(...)` or `failure(...)` does not, and a plain computed value is a `let`:
+
+```csharp
+var total = from value in source
+            from half in Halve(value)       // Halve returns Result<int, string>
+            let doubled = value * 2
+            select half + doubled;
+```
+
+`some` returns a real `Option<T>`, so option lambdas need neither.
+
+For the same reason, `success` and `failure` infer the payload's own type. When it is
+a case of a union, or a subclass, of the result's declared type — `AlreadyRegistered`
+for a `CustomerError` — name the wider type, as in `failure<CustomerError>(...)` above.
+The compiler reports the narrower one as CS0029, and the IDE fix supplies the type
+argument.
 
 Two things to watch:
 
@@ -213,22 +267,31 @@ attaching the debugger, which can distort timing.
 
 [`examples/`](examples) contains small projects that use the library the way an
 application would: a domain library, a console pipeline, an ASP.NET Core minimal
-API, `System.Text.Json` converters, and an F# consumer. They build with the
+API, `System.Text.Json` converters, an F# consumer, and a scripted game built on
+`Program<TOp, T>`. They build with the
 solution, and their README records the helpers the examples had to write
 themselves.
 
 ## Analyzers
 
 The core package ships Roslyn analyzers and code fixes for C# consumers, so no
-extra reference is needed. `Result<TSuccess, TFailure>`, `Validation<TSuccess, TError>`, and
-`ErrorResult<TSuccess, TFailure>` are structs, so `default`, `new()`, and arrays
+extra reference is needed. `Result<TSuccess, TFailure>`, `Validation<TSuccess, TError>`,
+`ErrorResult<TSuccess, TFailure>`, and `Program<TOp, T>` are structs, so `default`, `new()`, and arrays
 created without an initializer can produce a value with no case; `Option<TSome>`
 needs no rule because its zero value is `None`.
 
 | Rule | Default | Detects |
 | ---- | ------- | ------- |
-| `LSF0001` | Error | `default(T)`, `default` literals, `new T()`, and `new T[n]` for those three types |
+| `LSF0001` | Error | `default(T)`, `default` literals, `new T()`, and `new T[n]` for those four types |
 | `LSF0002` | Info | a case spelled through its closed union, such as `Result<A, B>.Success`, that a `using static` import would shorten; the fix adds the import and shortens the file |
+| `LSF0100` | Error | `[Instructions<TOp>]` on a class that is not a top-level, non-generic static partial class |
+| `LSF0101` | Error | `[Instructions<TOp>]` whose `TOp` is not a union |
+| `LSF0102` | Error | an instruction case that does not implement `IInstruction<TResult>` exactly once |
+
+A suppressor clears CA2012 on query expressions that produce a `ValueTask` of an
+`Option` or `Result`: `await (from ... select ...)` consumes the task once, but the
+compiler hides the final `SelectMany` from CA2012. Other `ValueTask` misuse is still
+reported.
 
 The code fixes also respond to the compiler: a case name that is not in scope
 (CS0246, CS0103) or that resolves to another imported union's case (CS8121) offers
@@ -297,6 +360,9 @@ consumer on upgrade:
 
 ## Using the library
 
+The samples below build values with the prelude, so they assume
+`using static LondoSpark.Func.Prelude;` (or `<LondoSparkFuncPrelude>true</LondoSparkFuncPrelude>`).
+
 ### Fluent composition
 
 Use `Option<T>` when a missing value is an expected outcome. Convert nullable
@@ -305,10 +371,10 @@ value. `None` skips the remaining steps:
 
 ```csharp
 static Option<int> ParseInteger(string text) =>
-    int.TryParse(text, out int value) ? Option.Return(value) : new None();
+    int.TryParse(text, out int value) ? some(value) : none;
 
 static Option<int> Divide(int numerator, int denominator) =>
-    denominator == 0 ? new None() : Option.Return(numerator / denominator);
+    denominator == 0 ? none : some(numerator / denominator);
 
 Option<int> quotient = ParseInteger("4")
     .Bind(divisor => Divide(100, divisor));
@@ -322,13 +388,13 @@ type:
 ```csharp
 static Result<int, string> ParseInteger(string text) =>
     int.TryParse(text, out int value)
-        ? Result.Return<int, string>(value)
-        : Result.Failure<int, string>("Expected an integer.");
+        ? success(value)
+        : failure("Expected an integer.");
 
 static Result<int, string> RequirePositive(int value) =>
     value > 0
-        ? Result.Return<int, string>(value)
-        : Result.Failure<int, string>("Expected a positive number.");
+        ? success(value)
+        : failure("Expected a positive number.");
 
 Result<int, string> result = ParseInteger("42")
     .Bind(RequirePositive)
@@ -340,9 +406,8 @@ Use `Apply` when the function and its input are independent computations.
 `Option` short-circuits on absence, and `Result` keeps its fail-fast behavior:
 
 ```csharp
-Result<Func<int, string>, string> format =
-    Result.Return<Func<int, string>, string>(id => $"Product {id}");
-Result<int, string> productId = Result.Return<int, string>(42);
+Result<Func<int, string>, string> format = success((int id) => $"Product {id}");
+Result<int, string> productId = success(42);
 
 Result<string, string> label = format.Apply(productId);
 ```
@@ -352,10 +417,10 @@ order instead of stopping at the first one. This is intentionally Applicative,
 not monadic: a later check can run even when an independent earlier check fails.
 
 ```csharp
-var makeFullName = Validation.Return<Func<string, Func<string, string>>, string>(
-    first => last => $"{first} {last}");
-var firstName = Validation.Failure<string, string>("First name is required.");
-var lastName = Validation.Failure<string, string>("Last name is required.");
+Validation<Func<string, Func<string, string>>, string> makeFullName =
+    success((string first) => (string last) => $"{first} {last}");
+Validation<string, string> firstName = failure("First name is required.");
+Validation<string, string> lastName = failure("Last name is required.");
 
 Validation<string, string> fullName =
     makeFullName.Apply(firstName).Apply(lastName);
@@ -368,8 +433,8 @@ the same short-circuiting behavior as fluent `Bind`:
 ```csharp
 static Result<int, string> Divide(int numerator, int denominator) =>
     denominator == 0
-        ? Result.Failure<int, string>("Division by zero.")
-        : Result.Return<int, string>(numerator / denominator);
+        ? failure("Division by zero.")
+        : success(numerator / denominator);
 
 var calculation =
     from numerator in ParseInteger("100")
@@ -378,12 +443,77 @@ var calculation =
     select quotient;
 ```
 
+Query syntax also composes asynchronous steps. Any `from` clause may be a plain
+`Option`/`Result`, a `Task` of one, or a `ValueTask` of one; the query produces a
+`ValueTask` and stops at the first absent value or failure without running later
+steps. A query whose steps complete synchronously allocates nothing beyond its own
+lambdas:
+
+```csharp
+var receipt = await (from amount in ParseInteger(input)        // Result
+                     from balance in accounts.DebitAsync(amount) // Task<Result>
+                     from email in mailer.ConfirmAsync(balance)  // ValueTask<Result>
+                     select new Receipt(balance, email));
+```
+
 Use `AsErrorResult()` when a pipeline should compose on failures instead of
 successes, for example to add context or recover. Convert between `Option<T>`
 and `Result<T, Unit>` when absence is the only failure information required.
 Convert a `Validation<TSuccess, TValidationError>` with `ToResult()` once gathering
 finishes, so the accumulated errors travel as one failure value through the
 sequential steps that follow.
+
+### Programs and instruction sets
+
+`Program<TOp, T>` is a program over an instruction set you declare: the free
+(operational) monad. Query syntax writes the program; an interpreter decides what
+each instruction means. The same program can run against a terminal, a database, a
+scripted test double, or a tracer, and it can be stepped one instruction at a time.
+
+Declare each instruction with the type its interpreter answers with, gather them in
+a union, and mark a static partial class to hold the generated instruction set:
+
+```csharp
+public sealed record Say(string Text) : IInstruction<Unit>;
+public sealed record Ask(string Prompt) : IInstruction<string>;
+public sealed record Pick(int Max) : IInstruction<int>;
+public union GameOp(Say, Ask, Pick);
+
+[Instructions<GameOp>]
+public static partial class Game;
+```
+
+The generator writes `Game.say`, `Game.ask`, `Game.pick`, and `Game.pure`, each
+returning a `Program<GameOp, T>`, plus `Game.IHandler` and `Game.IAsyncHandler` with
+one typed `Handle` method per instruction, and `Run` and `RunAsync` extensions that
+switch over the instructions exhaustively. With `using static Game;` a program reads
+as a script, and a loop is a recursive program:
+
+```csharp
+static Program<GameOp, int> Guess(int secret, int attempt) =>
+    from text in ask($"Guess #{attempt}:")
+    from guesses in int.TryParse(text, out var guess) && guess == secret
+        ? from _ in say("Yes!") select attempt
+        : from _ in say("No.") from more in Guess(secret, attempt + 1) select more
+    select guesses;
+
+sealed class ConsoleHost : Game.IHandler
+{
+    public Unit Handle(Say say) { Console.WriteLine(say.Text); return Unit.Value; }
+    public string Handle(Ask ask) => Console.ReadLine() ?? "";
+    public int Handle(Pick pick) => Random.Shared.Next(1, pick.Max + 1);
+}
+
+var guesses = (from secret in pick(100) from n in Guess(secret, 1) select n).Run(new ConsoleHost());
+```
+
+A program is itself a union of `Done(value)` and `Pending(instruction, next)`, so an
+interpreter can also be a hand-written loop, and `next.Resume(answer)` can be called
+more than once to replay or fork a program. Programs run in constant stack space
+however many instructions they run. Finished programs and lifted instructions do not
+allocate; each pending step allocates its continuation, and a value-typed answer is
+boxed once on its way through. Interpreters that answer with `object`
+(`program.Run(op => ...)`) also work without the generator.
 
 ### ASP.NET Core minimal APIs
 
@@ -394,6 +524,7 @@ domain. Map each domain failure to an HTTP response at the endpoint boundary:
 using LondoSpark.Func;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using static LondoSpark.Func.Prelude;
 using static LondoSpark.Func.Result<Product, ProductNotFound>;
 
 var app = WebApplication.CreateBuilder(args).Build();
@@ -402,8 +533,8 @@ app.Run();
 
 static Result<Product, ProductNotFound> FindProduct(int id) =>
     id == 42
-        ? new Success(new Product(id, "Answer"))
-        : new Failure(new ProductNotFound());
+        ? success(new Product(id, "Answer"))
+        : failure(new ProductNotFound());
 
 static Results<Ok<Product>, NotFound> ToHttpResult(
     Result<Product, ProductNotFound> result) =>
@@ -434,6 +565,7 @@ Components can keep loading, success, and expected failure explicit using
 @using LondoSpark.Func
 @using static LondoSpark.Func.Option<LondoSpark.Func.Result<Shop.Product, Shop.ProductNotFound>>
 @using static LondoSpark.Func.Result<Shop.Product, Shop.ProductNotFound>
+@using static LondoSpark.Func.Prelude
 @inject ProductService Products
 
 <p role="status">@ProductStatus</p>
@@ -441,7 +573,7 @@ Components can keep loading, success, and expected failure explicit using
 @code {
     [Parameter] public int ProductId { get; set; }
 
-    private Option<Result<Product, ProductNotFound>> _productResult = new None();
+    private Option<Result<Product, ProductNotFound>> _productResult = none;
 
     private string ProductStatus => _productResult switch
     {
@@ -451,7 +583,7 @@ Components can keep loading, success, and expected failure explicit using
     };
 
     protected override async Task OnParametersSetAsync() =>
-        _productResult = new Some(await Products.FindAsync(ProductId));
+        _productResult = some(await Products.FindAsync(ProductId));
 }
 ```
 

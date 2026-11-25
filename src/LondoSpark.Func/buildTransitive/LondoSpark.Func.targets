@@ -4,4 +4,10 @@
     <Using Include="LondoSpark.Func" />
   </ItemGroup>
 
+  <!-- Opt-in: <LondoSparkFuncPrelude>true</LondoSparkFuncPrelude> imports the lowercase
+       some/none/success/failure constructors into every C# file. -->
+  <ItemGroup Condition="'$(LondoSparkFuncPrelude)' == 'true' and '$(Language)' == 'C#'">
+    <Using Include="LondoSpark.Func.Prelude" Static="true" />
+  </ItemGroup>
+
 </Project>

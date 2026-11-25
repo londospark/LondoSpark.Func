@@ -30,9 +30,6 @@ namespace LondoSpark.Func;
 [Union]
 public readonly struct Option<TSome> : IEquatable<Option<TSome>>
 {
-    // One shared box for the absent case, so reading Value on None never allocates.
-    private static readonly object BoxedNone = new None();
-
     private readonly TSome _value;
     private readonly bool _isSome;
 
@@ -55,9 +52,9 @@ public readonly struct Option<TSome> : IEquatable<Option<TSome>>
     }
 
     /// <summary>Gets the boxed active case; the union contract requires this <c>object</c> property, so reading a present case boxes it. Never <see langword="null"/>.</summary>
-    /// <remarks>The absent case returns a shared instance and does not allocate.</remarks>
+    /// <remarks>The absent case returns one instance shared by every option type, so it does not allocate.</remarks>
     public object Value =>
-        _isSome ? new Some(_value) : BoxedNone;
+        _isSome ? new Some(_value) : None.Boxed;
 
     /// <summary>Gets a value indicating whether this option contains a case; always <see langword="true"/> because <see langword="default"/> is <see cref="None"/>.</summary>
     public bool HasValue => true;
@@ -123,7 +120,15 @@ public readonly struct Option<TSome> : IEquatable<Option<TSome>>
 }
 
 /// <summary>Represents the absence of a value without requiring a placeholder payload.</summary>
-public readonly record struct None;
+/// <remarks>
+/// One <see cref="None"/> serves every option type: it has no fields, so copies are free and all equal, and it
+/// converts implicitly to an absent <see cref="Option{TSome}"/> of any type.
+/// </remarks>
+public readonly record struct None
+{
+    // The single boxed None, returned by Option<T>.Value for every T so reading an absent case never allocates.
+    internal static readonly object Boxed = new None();
+}
 
 /// <summary>Starts an option computation.</summary>
 public static class Option

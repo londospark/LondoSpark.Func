@@ -22,7 +22,9 @@ namespace LondoSpark.Func;
 /// </code>
 /// When a file matches several result types, alias each one instead
 /// (<c>using Registration = Result&lt;Customer, CustomerError&gt;;</c>) and write <c>Registration.Success(var c)</c>.
-/// Both cases convert implicitly, so a method can <c>return new Success(customer);</c>.
+/// Build results with the <see cref="Prelude"/>: <c>return taken ? failure(new AlreadyRegistered(email)) : success(customer);</c>
+/// needs neither <c>new</c> nor type arguments. The cases also convert implicitly, so <c>return new Success(customer);</c>
+/// works too.
 /// </para>
 /// <para>
 /// Every value created by <c>Result.Return</c>, <c>Result.Failure</c>, or a case contains a case. Because this is a
@@ -143,6 +145,18 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
             FailureTag => $"Failure({_failure})",
             _ => "Result(default)"
         };
+
+    /// <summary>Completes a prelude <c>success(value)</c> once the context names the failure type.</summary>
+    /// <param name="value">The pending success.</param>
+    /// <returns>A successful result containing the value.</returns>
+    public static implicit operator Result<TSuccess, TFailure>(Prelude.Succeeded<TSuccess> value) =>
+        new Success(value.Value);
+
+    /// <summary>Completes a prelude <c>failure(error)</c> once the context names the success type.</summary>
+    /// <param name="value">The pending failure.</param>
+    /// <returns>A failed result containing the error.</returns>
+    public static implicit operator Result<TSuccess, TFailure>(Prelude.Failed<TFailure> value) =>
+        new Failure(value.Value);
 
     /// <summary>The successful case of <see cref="Result{TSuccess, TFailure}"/>, holding a value that may be null.</summary>
     /// <param name="Value">The successful value.</param>

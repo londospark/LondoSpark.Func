@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 using LondoSpark.Func;
 
-using static LondoSpark.Func.Result<Examples.DomainModeling.Customer, Examples.DomainModeling.CustomerError>;
+using static LondoSpark.Func.Prelude;
 
 namespace Examples.DomainModeling;
 
@@ -22,15 +22,15 @@ public sealed class CustomerDirectory
     /// <returns>The matching customer, or absence.</returns>
     public Option<Customer> Find(int id) =>
         _customers.TryGetValue(id, out var customer)
-            ? Option.Some(customer)
-            : Option.None<Customer>();
+            ? some(customer)
+            : none;
 
     /// <summary>Registers a validated customer, or reports why registration is not possible.</summary>
     /// <param name="candidate">The validated customer.</param>
     /// <returns>The registered customer, or a domain error naming the conflict.</returns>
     public Result<Customer, CustomerError> Register(NewCustomer candidate) =>
         _idsByEmail.ContainsKey(candidate.Email)
-            ? new Failure(new AlreadyRegistered(candidate.Email))
+            ? failure<CustomerError>(new AlreadyRegistered(candidate.Email))
             : Add(candidate);
 
     private Result<Customer, CustomerError> Add(NewCustomer candidate)
@@ -38,6 +38,6 @@ public sealed class CustomerDirectory
         var customer = new Customer(_nextId++, candidate.Name, candidate.Email, candidate.Age);
         _customers.Add(customer.Id, customer);
         _idsByEmail.Add(customer.Email, customer.Id);
-        return new Success(customer);
+        return success(customer);
     }
 }

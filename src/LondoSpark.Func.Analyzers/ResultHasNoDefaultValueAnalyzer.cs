@@ -9,7 +9,7 @@ namespace LondoSpark.Func.Analyzers;
 /// <summary>Reports struct unions in this library that are created without a case.</summary>
 /// <remarks>
 /// <c>Result&lt;TSuccess, TFailure&gt;</c>, <c>Validation&lt;TSuccess, TValidationError&gt;</c>, and
-/// <c>ErrorResult&lt;TSuccess, TFailure&gt;</c> are structs with no case that zero-initialisation can represent:
+/// <c>ErrorResult&lt;TSuccess, TFailure&gt;</c>, and <c>Program&lt;TOp, T&gt;</c> are structs with no case that zero-initialisation can represent:
 /// their case patterns never match and their operations throw. The library never produces such a value, so the
 /// only way to obtain one is <c>default</c>, <c>new()</c>, or an array created without an initializer, which this
 /// analyzer reports. Zeroing that the analyzer cannot see - unassigned fields, zeroed elements of a resized array,
@@ -29,7 +29,7 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
         "Usage",
         DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "A default, empty new, or zero-initialised Result, Validation, or ErrorResult contains no case: neither case pattern matches and its operations throw.",
+        description: "A default, empty new, or zero-initialised Result, Validation, ErrorResult, or Program contains no case: neither case pattern matches and its operations throw.",
         helpLinkUri: "https://github.com/londospark/LondoSpark.Func/blob/main/README.md#analyzers");
 
     /// <inheritdoc/>
@@ -48,6 +48,7 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
             Add(compilation, builder, "LondoSpark.Func.Result`2", "'Result.Return' or 'Result.Failure'");
             Add(compilation, builder, "LondoSpark.Func.Validation`2", "'Validation.Return' or 'Validation.Failure'");
             Add(compilation, builder, "LondoSpark.Func.ErrorResult`2", "'ErrorResult.Return' or 'AsErrorResult()'");
+            Add(compilation, builder, "LondoSpark.Func.Program`2", "'Program.Return', 'Program.Lift', or a generated instruction constructor");
 
             if (builder.Count == 0)
                 return;

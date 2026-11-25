@@ -26,6 +26,8 @@ The dependency-light core:
 - `Validation<TSuccess, TValidationError>` with nested `Success` and `Failure` cases.
 - Analyzers and code fixes that bring a closed union's cases into scope with
   `using static`, so switch arms name cases without type arguments.
+- A `Prelude` of lowercase `some`, `none`, `success`, and `failure` constructors,
+  the way to build values without `new` or type arguments.
 - `Return`, `Bind`, and mapping operations.
 - `MapError` and `BindError` for failure-side transformations.
 - `ToOption` conversions from nullable references and nullable value types.
@@ -39,9 +41,14 @@ name and a message, so failures can be grouped per input at a boundary.
 
 ### `LondoSpark.Func.Generators`
 
-An optional Roslyn incremental source generator that emits repetitive, type-specific
-LINQ operators from explicit monad metadata. Generated code is compile-time code; it
-must not use runtime reflection or add runtime dispatch.
+A Roslyn incremental source generator bundled into the `LondoSpark.Func` package
+beside the analyzers. Its first job is instruction sets: `[Instructions<TOp>]` on a
+static partial class reads the cases of the union `TOp`, each marked
+`IInstruction<TResult>`, and writes typed constructors returning `Program<TOp, T>`,
+typed handler interfaces, and exhaustive `Run`/`RunAsync` interpreters. The monad
+itself, `Program<TOp, T>`, is one hand-written generic type, so its operators and
+interpreters exist once rather than per instruction set. Generated code is
+compile-time code; it must not use runtime reflection or add runtime dispatch.
 
 ### `LondoSpark.Func.Analyzers`
 
@@ -301,6 +308,11 @@ current unary `SelectMany` operation is the bind operation under test; when an e
 
 ### Phase 4: source generator
 
+- Done first: the instruction-set generator for `Program<TOp, T>`, reading cases from
+  C# 15 union constructors.
+- Next: per-domain async builders (`async Registration<T>` over
+  `Result<T, CustomerError>`, `async Script<T>` over `Program<TOp, T>`) on top of the
+  query-syntax core.
 - Prototype the generator against `Option` and `Result`.
 - Define explicit metadata for focus and pass-through cases.
 - Generate the LINQ operator surface and compare its behavior with the hand-written

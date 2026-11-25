@@ -20,8 +20,16 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/LondoSpark.Func/LondoSpark.Func.csproj" />
-    <ProjectReference Include="../../src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj" />
+    <!-- The analyzers also run on the tests, as they do for consumers: the CA2012 suppressor is checked by the build. -->
+    <ProjectReference Include="../../src/LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="true" />
     <ProjectReference Include="../../src/LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj" />
+    <!-- Referenced for the generator's own tests and run as a generator, so the instruction sets declared in the
+         tests compile with the real C# 15 compiler. -->
+    <ProjectReference Include="../../src/LondoSpark.Func.Generators/LondoSpark.Func.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="true" />
     <ProjectReference Include="../../src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
     <ProjectReference Include="../../src/LondoSpark.Func.Json/LondoSpark.Func.Json.csproj" />
     <ProjectReference Include="../../src/LondoSpark.Func.AspNetCore/LondoSpark.Func.AspNetCore.csproj" />

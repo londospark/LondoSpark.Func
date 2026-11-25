@@ -38,6 +38,31 @@ public static class UnionCaseNames
     public static bool IsCase(ITypeSymbol? type) =>
         type is INamedTypeSymbol { ContainingType: { } union } && IsUnion(union);
 
+    /// <summary>The metadata name of the prelude of lowercase constructors.</summary>
+    public const string PreludeMetadataName = "LondoSpark.Func.Prelude";
+
+    /// <summary>Finds the union whose static import would bring the case <paramref name="symbol"/> into scope.</summary>
+    /// <param name="symbol">A nested case type such as <c>Result&lt;A, B&gt;.Success</c>.</param>
+    /// <returns>The constructed union, or <see langword="null"/> when the symbol is not a case.</returns>
+    public static INamedTypeSymbol? ImportingUnion(ISymbol? symbol) =>
+        symbol is INamedTypeSymbol caseType && IsCase(caseType) ? caseType.ContainingType : null;
+
+    /// <summary>Determines whether <paramref name="union"/> declares a nested case named <paramref name="name"/>.</summary>
+    /// <param name="union">The constructed union.</param>
+    /// <param name="name">The name written without its union.</param>
+    /// <returns><see langword="true"/> when a static import of the union would bring the name into scope.</returns>
+    public static bool DeclaresImportable(INamedTypeSymbol union, string name) =>
+        !union.GetTypeMembers(name).IsEmpty;
+
+    /// <summary>Determines whether <paramref name="name"/> is one of the prelude's lowercase constructors.</summary>
+    /// <param name="compilation">The compilation that references the library.</param>
+    /// <param name="name">The name written without an import.</param>
+    /// <returns><see langword="true"/> for <c>some</c>, <c>none</c>, <c>success</c>, or <c>failure</c>.</returns>
+    public static bool IsPreludeMember(Compilation compilation, string name) =>
+        compilation.GetTypeByMetadataName(PreludeMetadataName) is { } prelude
+        && prelude.GetMembers(name).Any(static member =>
+            member.IsStatic && member.DeclaredAccessibility == Accessibility.Public && member is IMethodSymbol or IFieldSymbol);
+
     /// <summary>Determines whether a union can be named by a <c>using static</c> directive, which cannot refer to type parameters.</summary>
     /// <param name="union">The constructed union.</param>
     /// <returns><see langword="true"/> when every type argument is a concrete type.</returns>

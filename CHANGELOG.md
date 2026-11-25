@@ -10,6 +10,22 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ### Added
 
+- `Program<TOp, T>`, the free (operational) monad over an instruction set you declare
+  as a union. Query syntax writes programs; interpreters give instructions meaning, so
+  one program runs against real effects, scripted test answers, or a tracer. A program
+  is a union of `Done` and `Pending`, so it can be stepped by hand, and a continuation
+  can be resumed more than once. Programs run in constant stack space, including
+  recursive loops of millions of steps.
+- An instruction-set source generator, bundled into the core package:
+  `[Instructions<TOp>]` on a static partial class writes lowercase constructors per
+  instruction (`ask(prompt)`), `pure`, typed `IHandler`/`IAsyncHandler` interfaces,
+  and exhaustive `Run`/`RunAsync` interpreters. `LSF0100`–`LSF0102` report a holder
+  class, instruction set, or instruction it cannot use.
+- Query syntax over asynchronous options and results: `from` clauses mix plain values,
+  `Task`, and `ValueTask`, and the query produces a `ValueTask` that stops at the first
+  absent value or failure. Queries whose steps complete synchronously allocate nothing
+  beyond their lambdas. A bundled suppressor clears the CA2012 false positive that
+  query expressions over `ValueTask` would otherwise raise.
 - `ValidationError`, a `(Field, Message)` error that renders as `field: message`, so
   validation failures can be reported per input.
 - `LondoSpark.Func.AspNetCore`: one `ToHttpResult` verb maps unions to responses.
@@ -28,6 +44,25 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 - `Result<TSuccess, TFailure>.ToExitCode()` maps a result to `0` or `1` for CLIs.
 - `Option.Some(value)` and `Option.None<T>()`, reading as the cases they create, alongside
   `Option.Return` and `Option.Empty`.
+- `LondoSpark.Func.Prelude`, the way to build values without constructors:
+  `some(x)`, `none`, `success(x)`, and `failure(e)`, so
+  `return taken ? failure(new AlreadyRegistered(email)) : success(customer);` needs no
+  `new` and no type arguments. `none` is the shared `None` value. `success` and
+  `failure` return small structs that convert implicitly to the result or validation
+  the context expects, without allocating; a lambda passed to `Bind` names its return
+  type, because C# does not infer through those conversions.
+  `<LondoSparkFuncPrelude>true</LondoSparkFuncPrelude>` imports the prelude
+  project-wide, and typing a prelude name without the import offers it as a code fix.
+- The case-import code fix finds the target type through conditionals, switch arms,
+  casts, and assignments as well as returns and declarations.
+- An allocation suite holds every non-allocating operation on `Option`, `Result`,
+  `ErrorResult`, `Validation`, `NonEmptyList`, the prelude, and the F# value
+  conversions to zero bytes, for value-type and reference-type payloads, and bounds
+  the deliberate allocations: boxing `Value`, new error lists, in-place appends, and
+  interface enumeration. The JSON converters allocate no more than their payload.
+  Asynchronous queries that complete synchronously, finished programs, and lifted
+  instructions are held to zero bytes; program steps are held to a bound.
+- Every `Option<T>` returns the same boxed `None` from `Value`, whatever `T` is.
 - Code fixes that import a union's cases: typing `Success(var c)` without the import
   offers `using static LondoSpark.Func.Result<...>;`, or the qualified name when an
   import would clash. `LSF0002` suggests the import for cases written in full, and its
@@ -85,7 +120,8 @@ Because it is pre-1.0, a minor version may contain breaking changes.
   their property names follow `PropertyNamingPolicy` and
   `PropertyNameCaseInsensitive`.
 - `LSF0001` no longer reports arrays created with an initializer or with length
-  zero, and now also reports zero-initialised `Validation` and `ErrorResult` values.
+  zero, and now also reports zero-initialised `Validation`, `ErrorResult`, and
+  `Program` values.
 - `Option<T>.Value` returns a shared `None` instance instead of boxing a new one,
   and `Some(null)` renders as `Some(null)` rather than `Some()`.
 - A `ValidationError` without a field is grouped under the empty-string key, as

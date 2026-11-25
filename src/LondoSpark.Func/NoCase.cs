@@ -15,7 +15,12 @@ internal static class NoCase
     internal const string ValidationMessage =
         "A default validation contains no case. Construct validations with Validation.Return or Validation.Failure.";
 
+    internal const string ProgramMessage =
+        "A default program contains no case. Construct programs with Program.Return, Program.Lift, or generated instruction constructors.";
+
     internal static InvalidOperationException Result() => new(ResultMessage);
+
+    internal static InvalidOperationException Program() => new(ProgramMessage);
 
     internal static InvalidOperationException Validation() => new(ValidationMessage);
 }

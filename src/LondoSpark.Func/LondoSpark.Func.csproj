@@ -29,6 +29,10 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"
                       PrivateAssets="all" />
+    <ProjectReference Include="../LondoSpark.Func.Generators/LondoSpark.Func.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,7 +43,7 @@
   </ItemGroup>
 
   <Target Name="PackAnalyzer">
-    <MSBuild Projects="../LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj;../LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj"
+    <MSBuild Projects="../LondoSpark.Func.Analyzers/LondoSpark.Func.Analyzers.csproj;../LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj;../LondoSpark.Func.Generators/LondoSpark.Func.Generators.csproj"
              Targets="GetTargetPath"
              Properties="Configuration=$(Configuration)">
       <Output TaskParameter="TargetOutputs" ItemName="_AnalyzerAssembly" />

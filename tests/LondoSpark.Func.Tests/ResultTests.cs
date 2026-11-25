@@ -208,7 +208,9 @@ public sealed class ResultTests
     [Test]
     public async Task ResultDefaultContainsNoCase()
     {
+#pragma warning disable LSF0001 // The zero value is the subject of this test.
         Result<int, string> defaultResult = default;
+#pragma warning restore LSF0001
         var successful = Result.Return<int, string>(1);
         var failed = Result.Failure<int, string>("invalid");
 
@@ -227,7 +229,9 @@ public sealed class ResultTests
     {
         await Assert.That(Result.Return<int, string>(7).ToString()).IsEqualTo("Success(7)");
         await Assert.That(Result.Failure<int, string>("invalid").ToString()).IsEqualTo("Failure(invalid)");
+#pragma warning disable LSF0001 // The zero value is the subject of this assertion.
         await Assert.That(default(Result<int, string>).ToString()).IsEqualTo("Result(default)");
+#pragma warning restore LSF0001
     }
 
     [Test]

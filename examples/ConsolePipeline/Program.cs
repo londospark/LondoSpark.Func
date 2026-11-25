@@ -4,6 +4,7 @@ using System.Linq;
 using Examples.DomainModeling;
 using LondoSpark.Func;
 using static LondoSpark.Func.Option<string>;
+using static LondoSpark.Func.Prelude;
 using static LondoSpark.Func.Result<string, string>;
 using FoundCustomer = LondoSpark.Func.Option<Examples.DomainModeling.Customer>;
 
@@ -14,6 +15,8 @@ using FoundCustomer = LondoSpark.Func.Option<Examples.DomainModeling.Customer>;
 // The static imports bring each union's cases into scope, so the switches below name
 // Some, Success, and Failure without type arguments and stay exhaustive. Option<string>
 // and Option<Customer> both have a Some case, so the second is reached through an alias.
+// The prelude's lowercase success(...) and failure(...) build results without new or
+// type arguments; the surrounding return type supplies the other side.
 //
 //   dotnet run --project examples/ConsolePipeline -- find 1
 //   dotnet run --project examples/ConsolePipeline -- add Ada ada@example.com 36
@@ -30,9 +33,9 @@ var outcome = args.FirstOrDefault().ToOption() switch
         args.ElementAtOrDefault(1),
         args.ElementAtOrDefault(2),
         args.ElementAtOrDefault(3))),
-    Some("list") => new Success(string.Join(Environment.NewLine, directory.All.Select(Describe))),
-    Some(var unknown) => new Failure($"Unknown command '{unknown}'."),
-    None => new Failure("Usage: find <id> | add <name> <email> <age> | list")
+    Some("list") => success(string.Join(Environment.NewLine, directory.All.Select(Describe))),
+    Some(var unknown) => failure($"Unknown command '{unknown}'."),
+    None => failure("Usage: find <id> | add <name> <email> <age> | list")
 };
 
 // ErrorResult focuses composition on the failure case without disturbing success.
@@ -54,11 +57,11 @@ static Result<string, string> Find(CustomerDirectory directory, string[] args) =
     {
         Some(var text) when int.TryParse(text, out var id) => directory.Find(id) switch
         {
-            FoundCustomer.Some(var customer) => new Success(Describe(customer)),
-            None => new Failure($"No customer with id {id}.")
+            FoundCustomer.Some(var customer) => success(Describe(customer)),
+            None => failure($"No customer with id {id}.")
         },
-        Some(var text) => new Failure($"'{text}' is not a customer id."),
-        None => new Failure("find requires a customer id.")
+        Some(var text) => failure($"'{text}' is not a customer id."),
+        None => failure("find requires a customer id.")
     };
 
 // Validate and register as one pipeline, then translate the domain error for the console.

@@ -128,6 +128,18 @@ public readonly struct Validation<TSuccess, TValidationError> : IEquatable<Valid
             _ => "Validation(default)"
         };
 
+    /// <summary>Completes a prelude <c>success(value)</c> once the context names the error type.</summary>
+    /// <param name="value">The pending success.</param>
+    /// <returns>A valid validation containing the value.</returns>
+    public static implicit operator Validation<TSuccess, TValidationError>(Prelude.Succeeded<TSuccess> value) =>
+        new Success(value.Value);
+
+    /// <summary>Completes a prelude <c>failure(error)</c> as an invalid validation with that one error.</summary>
+    /// <param name="value">The pending failure.</param>
+    /// <returns>An invalid validation containing the error.</returns>
+    public static implicit operator Validation<TSuccess, TValidationError>(Prelude.Failed<TValidationError> value) =>
+        new Failure(new NonEmptyList<TValidationError>(value.Value));
+
     /// <summary>The valid case of <see cref="Validation{TSuccess, TValidationError}"/>, holding a value that may be null.</summary>
     /// <param name="Value">The valid value.</param>
     public readonly record struct Success(TSuccess Value);

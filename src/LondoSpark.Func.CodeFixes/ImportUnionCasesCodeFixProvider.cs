@@ -37,9 +37,14 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
     // The name resolved, but to a case of a different union imported into the same file.
     private const string WrongPatternType = "CS8121";
 
+    // A prelude success(x) or failure(x) inferred the payload's own type, such as a union case, where the result
+    // declares a wider one; there is no conversion between the two pending wrappers.
+    private const string NoImplicitConversion = "CS0029";
+    private const string NoImplicitConversionCast = "CS0266";
+
     /// <inheritdoc/>
     public override ImmutableArray<string> FixableDiagnosticIds =>
-        [UndefinedType, UndefinedName, WrongPatternType, UnionCasesCanBeImportedAnalyzer.DiagnosticId];
+        [UndefinedType, UndefinedName, WrongPatternType, NoImplicitConversion, NoImplicitConversionCast, UnionCasesCanBeImportedAnalyzer.DiagnosticId];
 
     /// <summary>One import fixes every name of a union in the file, so batching separate fixes would duplicate it.</summary>
     /// <returns><see langword="null"/>; each union is imported by its own action.</returns>
@@ -57,7 +62,17 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
         {
             var node = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
 
-            if (diagnostic.Id == UnionCasesCanBeImportedAnalyzer.DiagnosticId)
+            if (diagnostic.Id is NoImplicitConversion or NoImplicitConversionCast)
+            {
+                RegisterPreludeTypeArgument(context, model, node, diagnostic, context.CancellationToken);
+            }
+            else if (diagnostic.Id == UndefinedName
+                && node is IdentifierNameSyntax { Parent: not MemberAccessExpressionSyntax } preludeName
+                && UnionCaseNames.IsPreludeMember(model.Compilation, preludeName.Identifier.ValueText))
+            {
+                RegisterPreludeImport(context, diagnostic);
+            }
+            else if (diagnostic.Id == UnionCasesCanBeImportedAnalyzer.DiagnosticId)
             {
                 RegisterImportOfQualifiedCases(context, model, node, diagnostic);
             }
@@ -69,6 +84,62 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
             }
         }
     }
+
+    /// <summary>Offers <c>failure&lt;CustomerError&gt;(error)</c> when <c>failure(error)</c> inferred a narrower type than the result needs.</summary>
+    private static void RegisterPreludeTypeArgument(
+        CodeFixContext context,
+        SemanticModel model,
+        SyntaxNode node,
+        Diagnostic diagnostic,
+        CancellationToken cancellationToken)
+    {
+        if (node.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>().FirstOrDefault() is not
+            {
+                Expression: IdentifierNameSyntax { Identifier.ValueText: "success" or "failure" } name,
+                ArgumentList.Arguments.Count: 1
+            } invocation
+            || model.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol { ContainingType: { } prelude }
+            || prelude.ToDisplayString() != UnionCaseNames.PreludeMetadataName
+            || CreationTarget(model, invocation, cancellationToken) is not INamedTypeSymbol { TypeArguments.Length: 2 } union
+            || !UnionCaseNames.IsUnion(union))
+        {
+            return;
+        }
+
+        // success fills the first type argument; failure fills the second, which for a validation is the error type.
+        var payloadType = union.TypeArguments[name.Identifier.ValueText == "success" ? 0 : 1];
+        if (!model.ClassifyConversion(invocation.ArgumentList.Arguments[0].Expression, payloadType).IsImplicit)
+            return;
+
+        var typeArgument = payloadType.ToMinimalDisplayString(model, invocation.SpanStart);
+        var title = $"Use '{name.Identifier.ValueText}<{typeArgument}>'";
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                title,
+                async token =>
+                {
+                    var root = await context.Document.GetSyntaxRootAsync(token).ConfigureAwait(false);
+                    var replacement = GenericName(name.Identifier, TypeArgumentList(SingletonSeparatedList(ParseTypeName(typeArgument))))
+                        .WithTriviaFrom(name);
+                    return context.Document.WithSyntaxRoot(root!.ReplaceNode(name, replacement));
+                },
+                equivalenceKey: "PreludeTypeArgument:" + title),
+            diagnostic);
+    }
+
+    private static void RegisterPreludeImport(CodeFixContext context, Diagnostic diagnostic) =>
+        context.RegisterCodeFix(
+            CodeAction.Create(
+                "Add 'using static LondoSpark.Func.Prelude;'",
+                async cancellationToken =>
+                {
+                    var root = (CompilationUnitSyntax?)await context.Document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+                    return root is null
+                        ? context.Document
+                        : await AddStaticUsingAsync(context.Document, root, UnionCaseNames.PreludeMetadataName, cancellationToken).ConfigureAwait(false);
+                },
+                equivalenceKey: "ImportPrelude"),
+            diagnostic);
 
     /// <summary>Finds the bare case name a diagnostic points at, which may be reported on the whole pattern.</summary>
     private static IdentifierNameSyntax? CaseIdentifier(SyntaxNode node) =>
@@ -89,7 +160,7 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
         Diagnostic diagnostic)
     {
         if (!UnionCaseNames.TryGetQualifiedCase(node, out _, out _)
-            || model.GetSymbolInfo(node, context.CancellationToken).Symbol is not INamedTypeSymbol { ContainingType: { } union })
+            || UnionCaseNames.ImportingUnion(model.GetSymbolInfo(node, context.CancellationToken).Symbol) is not { } union)
         {
             return;
         }
@@ -112,7 +183,7 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
     {
         var caseName = identifier.Identifier.ValueText;
         var union = FindTargetUnion(model, identifier, cancellationToken);
-        if (union is null || union.GetTypeMembers(caseName).IsEmpty)
+        if (union is null || !UnionCaseNames.DeclaresImportable(union, caseName))
             return;
 
         if (UnionCaseNames.CanImport(union)
@@ -189,23 +260,49 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
         };
     }
 
-    /// <summary>Finds the type a <c>new Case(...)</c> expression converts to, from its surrounding statement.</summary>
+    /// <summary>Finds the type a <c>new Case(...)</c> expression produces, from where its value goes.</summary>
+    /// <remarks>
+    /// The value may pass through a conditional (<c>taken ? new Failure(e) : new Success(c)</c>), parentheses, or a switch
+    /// expression arm before it reaches the return, declaration, cast, or assignment that names the union.
+    /// </remarks>
     private static ITypeSymbol? CreationTarget(
         SemanticModel model,
-        ObjectCreationExpressionSyntax creation,
+        ExpressionSyntax expression,
         CancellationToken cancellationToken)
     {
-        if (model.GetTypeInfo(creation, cancellationToken).ConvertedType is { TypeKind: not TypeKind.Error } converted
+        if (model.GetTypeInfo(expression, cancellationToken).ConvertedType is { TypeKind: not TypeKind.Error } converted
             && UnionCaseNames.IsUnion(converted))
         {
             return converted;
         }
 
-        return creation.Parent switch
+        SyntaxNode current = expression;
+        while (true)
         {
-            ReturnStatementSyntax or ArrowExpressionClauseSyntax => EnclosingReturnType(model, creation, cancellationToken),
+            switch (current.Parent)
+            {
+                case ParenthesizedExpressionSyntax parenthesized:
+                    current = parenthesized;
+                    continue;
+                case ConditionalExpressionSyntax conditional when conditional.Condition != current:
+                    current = conditional;
+                    continue;
+                case SwitchExpressionArmSyntax { Parent: SwitchExpressionSyntax switchExpression } arm when arm.Expression == current:
+                    current = switchExpression;
+                    continue;
+            }
+
+            break;
+        }
+
+        return current.Parent switch
+        {
+            ReturnStatementSyntax or ArrowExpressionClauseSyntax => EnclosingReturnType(model, current, cancellationToken),
             EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax { Type: { IsVar: false } type } } } =>
                 model.GetTypeInfo(type, cancellationToken).Type,
+            CastExpressionSyntax cast => model.GetTypeInfo(cast.Type, cancellationToken).Type,
+            AssignmentExpressionSyntax assignment when assignment.Right == current =>
+                model.GetTypeInfo(assignment.Left, cancellationToken).Type,
             _ => null
         };
     }
@@ -256,7 +353,7 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
         {
             if (UnionCaseNames.TryGetQualifiedCase(node, out var unionName, out var caseName)
                 && !(unionName is IdentifierNameSyntax left && model.GetAliasInfo(left, cancellationToken) is not null)
-                && model.GetSymbolInfo(node, cancellationToken).Symbol is INamedTypeSymbol { ContainingType: { } containing }
+                && UnionCaseNames.ImportingUnion(model.GetSymbolInfo(node, cancellationToken).Symbol) is { } containing
                 && SymbolEqualityComparer.Default.Equals(containing, union))
             {
                 qualifiedCases.Add((node, caseName.Identifier.ValueText));
@@ -276,15 +373,22 @@ public sealed class ImportUnionCasesCodeFixProvider : CodeFixProvider
             caseNames.Keys,
             (original, _) => IdentifierName(caseNames[original]).WithTriviaFrom(original));
 
-        if (!alreadyImported)
-        {
-            var directive = UsingDirective(Token(SyntaxKind.StaticKeyword), null, ParseName(import))
-                .WithAdditionalAnnotations(Formatter.Annotation);
-            updated = updated.AddUsings(directive);
-        }
+        return alreadyImported
+            ? document.WithSyntaxRoot(updated)
+            : await AddStaticUsingAsync(document, updated, import, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<Document> AddStaticUsingAsync(
+        Document document,
+        CompilationUnitSyntax root,
+        string import,
+        CancellationToken cancellationToken)
+    {
+        var directive = UsingDirective(Token(SyntaxKind.StaticKeyword), null, ParseName(import))
+            .WithAdditionalAnnotations(Formatter.Annotation);
 
         return await Formatter.FormatAsync(
-            document.WithSyntaxRoot(updated),
+            document.WithSyntaxRoot(root.AddUsings(directive)),
             Formatter.Annotation,
             cancellationToken: cancellationToken).ConfigureAwait(false);
     }

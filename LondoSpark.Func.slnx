@@ -5,6 +5,7 @@
     <Project Path="examples/FSharpPipeline/FSharpPipeline.fsproj" />
     <Project Path="examples/JsonSerialization/JsonSerialization.csproj" />
     <Project Path="examples/MinimalApi/MinimalApi.csproj" />
+    <Project Path="examples/Scripting/Scripting.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/LondoSpark.Func/LondoSpark.Func.csproj" />
@@ -12,6 +13,7 @@
     <Project Path="src/LondoSpark.Func.AspNetCore/LondoSpark.Func.AspNetCore.csproj" />
     <Project Path="src/LondoSpark.Func.CodeFixes/LondoSpark.Func.CodeFixes.csproj" />
     <Project Path="src/LondoSpark.Func.FSharp/LondoSpark.Func.FSharp.csproj" />
+    <Project Path="src/LondoSpark.Func.Generators/LondoSpark.Func.Generators.csproj" />
     <Project Path="src/LondoSpark.Func.Json/LondoSpark.Func.Json.csproj" />
   </Folder>
   <Folder Name="/tests/">

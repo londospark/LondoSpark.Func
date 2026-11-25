@@ -71,6 +71,136 @@ public sealed class ImportUnionCasesTests
     }
 
     [Test]
+    public async Task CasesConstructedInAConditionalOfferTheStaticImport()
+    {
+        var fixedSource = await ApplyFixAsync(
+            """
+            using LondoSpark.Func;
+
+            public sealed record Taken(string Email);
+
+            public static class Sample
+            {
+                public static Result<int, Taken> Register(bool taken, string email, int id)
+                {
+                    return taken ? new Failure(new Taken(email)) : new Success(id);
+                }
+            }
+            """,
+            "CS0246",
+            "Add 'using static");
+
+        await Assert.That(fixedSource).Contains("using static LondoSpark.Func.Result<int, Taken>;");
+        await Assert.That(fixedSource).Contains("return taken ? new Failure(new Taken(email)) : new Success(id);");
+    }
+
+    [Test]
+    public async Task PreludeNamesOfferThePreludeImport()
+    {
+        const string source =
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static Option<int> Find(int id) => id > 0 ? some(id) : none;
+
+                public static Result<int, string> Parse(string text) =>
+                    int.TryParse(text, out var number) ? success(number) : failure(text);
+            }
+            """;
+
+        // One undefined-name error for each of some, none, success, and failure; each offers the import.
+        var titles = await FixTitlesAsync(source, "CS0103");
+        await Assert.That(titles.Count(static title => title == "Add 'using static LondoSpark.Func.Prelude;'")).IsEqualTo(4);
+
+        var fixedSource = await ApplyFixAsync(source, "CS0103", "Add 'using static LondoSpark.Func.Prelude;'");
+
+        await Assert.That(fixedSource).Contains("using static LondoSpark.Func.Prelude;");
+        await Assert.That(fixedSource).Contains("id > 0 ? some(id) : none;");
+    }
+
+    [Test]
+    public async Task NarrowFailurePayloadOffersTheDeclaredTypeArgument()
+    {
+        var fixedSource = await ApplyFixAsync(
+            """
+            using LondoSpark.Func;
+            using static LondoSpark.Func.Prelude;
+
+            public abstract record CustomerError;
+            public sealed record AlreadyRegistered(string Email) : CustomerError;
+
+            public static class Sample
+            {
+                public static Result<int, CustomerError> Register(bool taken, string email) =>
+                    taken ? failure(new AlreadyRegistered(email)) : success(1);
+            }
+            """,
+            "CS0029",
+            "Use 'failure<CustomerError>'");
+
+        await Assert.That(fixedSource).Contains("taken ? failure<CustomerError>(new AlreadyRegistered(email)) : success(1);");
+    }
+
+    [Test]
+    public async Task NarrowSuccessPayloadOffersTheDeclaredTypeArgument()
+    {
+        var fixedSource = await ApplyFixAsync(
+            """
+            using LondoSpark.Func;
+            using static LondoSpark.Func.Prelude;
+
+            public class Animal;
+            public sealed class Dog : Animal;
+
+            public static class Sample
+            {
+                public static Result<Animal, string> Adopt() => success(new Dog());
+            }
+            """,
+            "CS0029",
+            "Use 'success<Animal>'");
+
+        await Assert.That(fixedSource).Contains("=> success<Animal>(new Dog());");
+    }
+
+    [Test]
+    public async Task UnrelatedPayloadOffersNoTypeArgument()
+    {
+        var titles = await FixTitlesAsync(
+            """
+            using LondoSpark.Func;
+            using static LondoSpark.Func.Prelude;
+
+            public static class Sample
+            {
+                public static Result<int, string> Parse() => failure(42);
+            }
+            """,
+            "CS0029");
+
+        await Assert.That(titles.Any(static title => title.StartsWith("Use 'failure<", StringComparison.Ordinal))).IsFalse();
+    }
+
+    [Test]
+    public async Task UnrelatedLowercaseNamesDoNotOfferThePrelude()
+    {
+        var titles = await FixTitlesAsync(
+            """
+            using LondoSpark.Func;
+
+            public static class Sample
+            {
+                public static int Read() => somewhere(1) + other.success;
+            }
+            """,
+            "CS0103");
+
+        await Assert.That(titles.Any(static title => title.Contains("Prelude", StringComparison.Ordinal))).IsFalse();
+    }
+
+    [Test]
     public async Task ImportNamesTypeArgumentsWithTheirNamespaces()
     {
         var fixedSource = await ApplyFixAsync(

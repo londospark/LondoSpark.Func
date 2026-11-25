@@ -55,13 +55,9 @@ public sealed class UnionCasesCanBeImportedAnalyzer : DiagnosticAnalyzer
             return;
 
         var name = context.Node;
-        if (context.SemanticModel.GetSymbolInfo(name, context.CancellationToken).Symbol is not INamedTypeSymbol caseType
-            || !UnionCaseNames.IsCase(caseType)
-            || caseType.ContainingType is not { } union
-            || !UnionCaseNames.CanImport(union))
-        {
+        var symbol = context.SemanticModel.GetSymbolInfo(name, context.CancellationToken).Symbol;
+        if (UnionCaseNames.ImportingUnion(symbol) is not { } union || !UnionCaseNames.CanImport(union))
             return;
-        }
 
         // An alias is the documented way to match several unions in one file; leave it alone.
         if (unionName is IdentifierNameSyntax left && context.SemanticModel.GetAliasInfo(left, context.CancellationToken) is not null)
@@ -76,7 +72,7 @@ public sealed class UnionCasesCanBeImportedAnalyzer : DiagnosticAnalyzer
             name.GetLocation(),
             ImmutableDictionary<string, string?>.Empty.Add(ImportProperty, import),
             import,
-            caseType.Name));
+            symbol!.Name));
     }
 
     /// <summary>Determines whether a static import of <paramref name="union"/> would make a case name ambiguous.</summary>
