@@ -8,6 +8,8 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ## [Unreleased]
 
+## [0.4.0-prealpha.1] - 2026-11-25
+
 ### Added
 
 - `await` as do-notation. `async Option<T>` methods unwrap each awaited option and
@@ -237,7 +239,8 @@ iterations that were never tagged or published; their changes are folded in here
 - `Option<TSome>`, `Result<TSuccess, TFailure>`, `ErrorResult<TSuccess, TFailure>`,
   `Unit`, LINQ query operators, and `Option`/`Result` conversions.
 
-[Unreleased]: https://github.com/londospark/LondoSpark.Func/compare/v0.3.0-prealpha.1...HEAD
+[Unreleased]: https://github.com/londospark/LondoSpark.Func/compare/v0.4.0-prealpha.1...HEAD
+[0.4.0-prealpha.1]: https://github.com/londospark/LondoSpark.Func/compare/v0.3.0-prealpha.1...v0.4.0-prealpha.1
 [0.3.0-prealpha.1]: https://github.com/londospark/LondoSpark.Func/compare/v0.2.0-prealpha.2...v0.3.0-prealpha.1
 [0.2.0-prealpha.2]: https://github.com/londospark/LondoSpark.Func/compare/v0.2.0-prealpha.1...v0.2.0-prealpha.2
 [0.2.0-prealpha.1]: https://github.com/londospark/LondoSpark.Func/compare/v0.0.1-prealpha.2...v0.2.0-prealpha.1
