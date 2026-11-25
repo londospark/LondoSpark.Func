@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace LondoSpark.Func;
@@ -28,7 +29,8 @@ namespace LondoSpark.Func;
 /// </para>
 /// </remarks>
 [Union]
-public readonly struct Option<TSome> : IEquatable<Option<TSome>>
+[AsyncMethodBuilder(typeof(OptionMethodBuilder<>))]
+public readonly struct Option<TSome> : IEquatable<Option<TSome>>, IShortCircuit<Option<TSome>>
 {
     private readonly TSome _value;
     private readonly bool _isSome;
@@ -106,6 +108,17 @@ public readonly struct Option<TSome> : IEquatable<Option<TSome>>
     public static bool operator !=(Option<TSome> left, Option<TSome> right) =>
         !left.Equals(right);
 
+    /// <summary>Lets <c>await</c> unwrap the present value inside <c>async Option&lt;T&gt;</c>, short-circuiting to <see cref="None"/> when absent.</summary>
+    /// <returns>An awaiter that completes synchronously.</returns>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public OptionAwaiter<TSome> GetAwaiter() => new(this);
+
+    static bool IShortCircuit<Option<TSome>>.TryShortCircuit(ShortCircuitException exception, out Option<TSome> value)
+    {
+        value = default;
+        return exception.GetType() == typeof(ShortCircuitException);
+    }
+
     /// <summary>Renders the active case, using <c>Some(</c> and <c>None</c> so absence is visible in logs.</summary>
     /// <returns><c>Some(value)</c> for a present value, <c>Some(null)</c> for a present null, or <c>None</c>.</returns>
     public override string ToString() =>
@@ -128,6 +141,11 @@ public readonly record struct None
 {
     // The single boxed None, returned by Option<T>.Value for every T so reading an absent case never allocates.
     internal static readonly object Boxed = new None();
+
+    /// <summary>Lets <c>await none;</c> end an <c>async Option&lt;T&gt;</c> method with <see cref="None"/>.</summary>
+    /// <returns>An awaiter that always short-circuits.</returns>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public NoneAwaiter GetAwaiter() => default;
 }
 
 /// <summary>Starts an option computation.</summary>

@@ -10,6 +10,8 @@ would. They build with the rest of the solution, so they cannot drift from the A
 | [`MinimalApi`](MinimalApi) | ASP.NET Core minimal API | one `Validate(...).Bind(Register).ToHttpResult(...)` pipeline, `ToHttpResult()` for a plain map, and field-keyed `400` problems from `LondoSpark.Func.AspNetCore` |
 | [`JsonSerialization`](JsonSerialization) | console app | `LondoSpark.Func.Json` converters that round-trip `Option<T>` and `Result<TSuccess, TFailure>` |
 | [`FSharpPipeline`](FSharpPipeline) | F# console app | lossless F# `option`/`Result` round-trips through the core types |
+| [`AsyncCheckout`](AsyncCheckout) | console app | one query over a plain `Result`, a `Task<Result>`, and a `ValueTask<Result>` that stops at the first failure, the same checkout written with `await` and `ShortCircuitMethodBuilder`, validation as an `async` method returning an `[AsyncResult]` type, and exhaustive switches over the result and the domain's `CheckoutError` union |
+| [`Runbook`](Runbook) | console app | a release runbook as a `Program<RunbookOp, Result<string, string>>`, run as a dry run, against an asynchronous simulated machine, and stepped by hand to an approval that is then resumed both ways |
 | [`Scripting`](Scripting) | console app | a guessing game written as a `Program<GameOp, int>` over a generated instruction set, run by a terminal interpreter or, with `--demo`, a replay interpreter |
 
 ## Running
@@ -20,6 +22,8 @@ dotnet run --project examples/MinimalApi
 dotnet run --project examples/JsonSerialization
 dotnet run --project examples/FSharpPipeline
 dotnet run --project examples/Scripting -- --demo
+dotnet run --project examples/AsyncCheckout
+dotnet run --project examples/Runbook
 ```
 
 ## What the examples ask of the library

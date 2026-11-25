@@ -49,6 +49,7 @@ public sealed class InstructionsGeneratorTests
 
         await Assert.That(diagnostics).IsEmpty();
         await Assert.That(source).Contains("static partial class Script");
+        await Assert.That(source).Contains("CA1708");
         await Assert.That(source).Contains("Program<global::Sample.Op, string> ask(string prompt)");
         await Assert.That(source).Contains("Program<global::Sample.Op, string> ask(global::Sample.Ask instruction)");
         await Assert.That(source).Contains("wait(int seconds = 1, string? @class = default)");

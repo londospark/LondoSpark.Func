@@ -8,6 +8,34 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `await` as do-notation. `async Option<T>` methods unwrap each awaited option and
+  return `None` at the first absent one (`await none;` ends one explicitly). Results
+  need a task-like type with one type parameter, so `[AsyncResult<TFailure>]` on a
+  partial struct generates one, such as `Registration<T>` over
+  `Result<T, CustomerError>`: a union of the result's cases that converts to and from
+  it, where `await failure(error);` fails the method. Both run synchronously.
+- `ShortCircuitMethodBuilder<>`, for `async ValueTask` methods that return an option,
+  result, or generated result type: they await tasks as usual and short-circuit on an
+  absent or failed await.
+- A short-circuit unwinds with a `ShortCircuitException`, so `finally` blocks and
+  `using` declarations run; methods that finish allocate nothing in Release builds.
+  `LSF0003` reports an await whose method cannot return its absent or failed case,
+  `LSF0004` a `catch` that would swallow the short-circuit, and `LSF0005` a
+  synchronous method that awaits a task. `LSF0103` reports an `[AsyncResult]` type of
+  the wrong shape, and `LSF0001` now covers generated result types.
+
+- Examples: `AsyncCheckout` composes plain, `Task`, and `ValueTask` results in one
+  query, and again with `await`; `Runbook` runs one release runbook as a dry run, against a simulated machine,
+  and stepped by hand to an approval resumed both ways.
+
+### Fixed
+
+- An instruction named `Run` or `RunAsync` no longer trips CA1708 on its holder
+  class, whose generated lowercase constructor differs from the interpreter only by
+  case.
+
 ## [0.3.0-prealpha.1] - 2026-11-25
 
 ### Added

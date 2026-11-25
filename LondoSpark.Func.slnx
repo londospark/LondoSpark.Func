@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/examples/">
+    <Project Path="examples/AsyncCheckout/AsyncCheckout.csproj" />
     <Project Path="examples/ConsolePipeline/ConsolePipeline.csproj" />
     <Project Path="examples/DomainModeling/DomainModeling.csproj" />
     <Project Path="examples/FSharpPipeline/FSharpPipeline.fsproj" />
     <Project Path="examples/JsonSerialization/JsonSerialization.csproj" />
     <Project Path="examples/MinimalApi/MinimalApi.csproj" />
+    <Project Path="examples/Runbook/Runbook.csproj" />
     <Project Path="examples/Scripting/Scripting.csproj" />
   </Folder>
   <Folder Name="/src/">

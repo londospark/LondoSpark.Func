@@ -267,8 +267,8 @@ attaching the debugger, which can distort timing.
 
 [`examples/`](examples) contains small projects that use the library the way an
 application would: a domain library, a console pipeline, an ASP.NET Core minimal
-API, `System.Text.Json` converters, an F# consumer, and a scripted game built on
-`Program<TOp, T>`. They build with the
+API, `System.Text.Json` converters, an F# consumer, an asynchronous checkout written
+as one query and again with `await`, and a scripted game and a release runbook built on `Program<TOp, T>`. They build with the
 solution, and their README records the helpers the examples had to write
 themselves.
 
@@ -276,17 +276,21 @@ themselves.
 
 The core package ships Roslyn analyzers and code fixes for C# consumers, so no
 extra reference is needed. `Result<TSuccess, TFailure>`, `Validation<TSuccess, TError>`,
-`ErrorResult<TSuccess, TFailure>`, and `Program<TOp, T>` are structs, so `default`, `new()`, and arrays
+`ErrorResult<TSuccess, TFailure>`, `Program<TOp, T>`, and `[AsyncResult]` types are structs, so `default`, `new()`, and arrays
 created without an initializer can produce a value with no case; `Option<TSome>`
 needs no rule because its zero value is `None`.
 
 | Rule | Default | Detects |
 | ---- | ------- | ------- |
-| `LSF0001` | Error | `default(T)`, `default` literals, `new T()`, and `new T[n]` for those four types |
+| `LSF0001` | Error | `default(T)`, `default` literals, `new T()`, and `new T[n]` for those types |
 | `LSF0002` | Info | a case spelled through its closed union, such as `Result<A, B>.Success`, that a `using static` import would shorten; the fix adds the import and shortens the file |
+| `LSF0003` | Error | `await` of an option, result, `none`, or `failure(...)` in a method that cannot return its absent or failed case |
+| `LSF0004` | Warning | an unfiltered `catch` that would swallow the short-circuit of an awaited option or result |
+| `LSF0005` | Error | `async Option<T>` or an `[AsyncResult]` method awaiting something that can suspend |
 | `LSF0100` | Error | `[Instructions<TOp>]` on a class that is not a top-level, non-generic static partial class |
 | `LSF0101` | Error | `[Instructions<TOp>]` whose `TOp` is not a union |
 | `LSF0102` | Error | an instruction case that does not implement `IInstruction<TResult>` exactly once |
+| `LSF0103` | Error | `[AsyncResult<TFailure>]` on a type that is not a top-level partial struct with one type parameter |
 
 A suppressor clears CA2012 on query expressions that produce a `ValueTask` of an
 `Option` or `Result`: `await (from ... select ...)` consumes the task once, but the
@@ -462,6 +466,66 @@ and `Result<T, Unit>` when absence is the only failure information required.
 Convert a `Validation<TSuccess, TValidationError>` with `ToResult()` once gathering
 finishes, so the accumulated errors travel as one failure value through the
 sequential steps that follow.
+
+### Async methods over options and results
+
+`await` works as do-notation too. Inside `async Option<T>`, awaiting an option
+unwraps its value, and an absent one ends the method with `None`; `await none;` ends
+it explicitly. The method runs synchronously:
+
+```csharp
+async Option<string> ShippingLabel(int customerId)
+{
+    var customer = await directory.Find(customerId);   // Option<Customer>
+    var address = await customer.DefaultAddress;       // Option<Address>
+    if (address.Country != "GB") await none;
+    return $"{customer.Name}, {address.Postcode}";
+}
+```
+
+C# accepts only task-like types with one type parameter, so `async Result<T, E>`
+cannot be written. Fix the failure type in a struct of your own and the bundled
+generator completes it:
+
+```csharp
+[AsyncResult<CustomerError>]
+public readonly partial struct Registration<T>;
+
+async Registration<Customer> Register(NewCustomer candidate)
+{
+    var email = await Email.Parse(candidate.Email);    // Result<Email, CustomerError>
+    if (directory.Contains(email)) await failure(new AlreadyRegistered(email));
+    return directory.Add(email);
+}
+```
+
+`Registration<T>` is a union over `Result<T, CustomerError>`'s `Success` and
+`Failure` cases, converts to and from that result implicitly, and can itself be
+awaited. `AsResult()` hands it to query syntax.
+
+To await tasks as well, return a `ValueTask` and name the builder on the method.
+`await await` waits for a task and then unwraps the option or result it produced:
+
+```csharp
+[AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
+async ValueTask<Result<Receipt, CheckoutError>> CheckoutAsync(Order order)
+{
+    var valid = await Validate(order);
+    var total = await await inventory.ReserveAsync(valid.Sku, valid.Quantity);
+    var payment = await await payments.ChargeAsync(valid.Customer, total);
+    return success(new Receipt(payment, total));
+}
+```
+
+An absent or failed await throws a `ShortCircuitException` that the method's builder
+turns back into `None` or the failure, so `finally` blocks and `using` declarations
+run as the method unwinds. Methods that finish allocate nothing in Release builds;
+a short-circuit allocates its exception (about 300 bytes) and costs an exception
+throw, so on a hot path where failure is common, prefer query syntax. Three
+analyzers keep the exception inside the method: `LSF0003` reports an await whose
+method cannot return its absent or failed case, `LSF0004` a `catch` that would
+swallow it (filter with `when (e is not ShortCircuitException)`), and `LSF0005` a
+synchronous method that awaits a task.
 
 ### Programs and instruction sets
 

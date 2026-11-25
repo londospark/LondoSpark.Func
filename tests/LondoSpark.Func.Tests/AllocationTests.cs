@@ -29,6 +29,14 @@ public sealed class AllocationTests
 {
     private const int Iterations = 2_000;
 
+    // A short-circuit allocates its exception and the stack trace recorded while it unwinds; a Debug build's class
+    // state machine adds to that.
+#if DEBUG
+    private const long ShortCircuitBound = 448;
+#else
+    private const long ShortCircuitBound = 320;
+#endif
+
     // ----- Inputs -----
 
     private static readonly Option<int> SomeInt = Option.Return(41);
@@ -361,7 +369,27 @@ public sealed class AllocationTests
             .SelectMany(static value => CompletedResult, static (a, b) => a + b)));
     }
 
+    [Test]
+    public async Task AsyncMethodsThatDoNotShortCircuitDoNotAllocate()
+    {
+        await AssertNoAllocation(static () => SumOption(SomeInt, SomeInt));
+        await AssertNoAllocation(static () => SumParsed(SuccessInt, SuccessInt));
+        await AssertNoAllocation(static () => Completed(SumOptionLater(SomeInt)));
+        await AssertNoAllocation(static () => Completed(SumResultLater(SuccessInt)));
+    }
+
 #endif
+
+    [Test]
+    public async Task AShortCircuitAllocatesOnlyItsException()
+    {
+        // The exception and the stack trace the runtime records while it unwinds the method.
+        var absent = Measure(static () => SumOption(SomeInt, NoneInt));
+        var failed = Measure(static () => SumParsed(SuccessInt, FailureInt));
+
+        await Assert.That(absent).IsGreaterThan(0L).And.IsLessThanOrEqualTo(ShortCircuitBound);
+        await Assert.That(failed).IsGreaterThan(0L).And.IsLessThanOrEqualTo(ShortCircuitBound);
+    }
 
     // ----- Programs -----
 
@@ -497,6 +525,20 @@ public sealed class AllocationTests
         operation();
         return GC.GetAllocatedBytesForCurrentThread() - before;
     }
+
+    private static async Option<int> SumOption(Option<int> first, Option<int> second) =>
+        await first + await second;
+
+    private static async Parsed<int> SumParsed(Result<int, string> first, Result<int, string> second) =>
+        await first + await second;
+
+    [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
+    private static async ValueTask<Option<int>> SumOptionLater(Option<int> value) =>
+        some(await value + await await CompletedOption);
+
+    [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
+    private static async ValueTask<Result<int, string>> SumResultLater(Result<int, string> value) =>
+        success(await value + await await CompletedResult);
 
     // Reads a query that must have completed synchronously; a suspension would be a test failure, not a wait.
     private static T Completed<T>(ValueTask<T> task) =>

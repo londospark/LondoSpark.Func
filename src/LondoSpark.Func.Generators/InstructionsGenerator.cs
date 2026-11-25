@@ -183,6 +183,8 @@ public sealed class InstructionsGenerator : IIncrementalGenerator
             builder.AppendLine();
         }
 
+        // An instruction named Run or RunAsync gets a lowercase constructor beside the interpreter of the same name.
+        builder.AppendLine("[global::System.Diagnostics.CodeAnalysis.SuppressMessage(\"Naming\", \"CA1708:Identifiers should differ by more than case\", Justification = \"Lowercase instruction constructors sit beside Run and RunAsync.\")]");
         builder.Append("static partial class ").AppendLine(set.ClassName);
         builder.AppendLine("{");
 

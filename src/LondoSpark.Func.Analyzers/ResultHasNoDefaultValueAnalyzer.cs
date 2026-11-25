@@ -9,7 +9,7 @@ namespace LondoSpark.Func.Analyzers;
 /// <summary>Reports struct unions in this library that are created without a case.</summary>
 /// <remarks>
 /// <c>Result&lt;TSuccess, TFailure&gt;</c>, <c>Validation&lt;TSuccess, TValidationError&gt;</c>, and
-/// <c>ErrorResult&lt;TSuccess, TFailure&gt;</c>, and <c>Program&lt;TOp, T&gt;</c> are structs with no case that zero-initialisation can represent:
+/// <c>ErrorResult&lt;TSuccess, TFailure&gt;</c>, <c>Program&lt;TOp, T&gt;</c>, and structs marked <c>[AsyncResult&lt;TFailure&gt;]</c> are structs with no case that zero-initialisation can represent:
 /// their case patterns never match and their operations throw. The library never produces such a value, so the
 /// only way to obtain one is <c>default</c>, <c>new()</c>, or an array created without an initializer, which this
 /// analyzer reports. Zeroing that the analyzer cannot see - unassigned fields, zeroed elements of a resized array,
@@ -53,7 +53,7 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
             if (builder.Count == 0)
                 return;
 
-            var guarded = builder.ToImmutable();
+            var guarded = new Guarded(builder.ToImmutable(), compilation.GetTypeByMetadataName("LondoSpark.Func.AsyncResultAttribute`1"));
 
             compilationContext.RegisterOperationAction(
                 operationContext => Report(operationContext, operationContext.Operation.Type, guarded),
@@ -109,10 +109,10 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
     private static void Report(
         OperationAnalysisContext context,
         ITypeSymbol? type,
-        ImmutableDictionary<INamedTypeSymbol, string> guarded)
+        Guarded guarded)
     {
         if (type is not INamedTypeSymbol namedType
-            || !guarded.TryGetValue(namedType.OriginalDefinition, out var constructionHint))
+            || guarded.Hint(namedType.OriginalDefinition) is not { } constructionHint)
         {
             return;
         }
@@ -123,5 +123,23 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
                 context.Operation.Syntax.GetLocation(),
                 namedType.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
                 constructionHint));
+    }
+
+    // The library's own unions, plus every struct the generator completes from [AsyncResult<TFailure>], which wraps a result.
+    private sealed class Guarded(ImmutableDictionary<INamedTypeSymbol, string> known, INamedTypeSymbol? asyncResult)
+    {
+        public string? Hint(INamedTypeSymbol type)
+        {
+            if (known.TryGetValue(type, out var hint))
+                return hint;
+
+            foreach (var attribute in type.GetAttributes())
+            {
+                if (asyncResult is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, asyncResult))
+                    return "a prelude 'success' or 'failure', or a conversion from a result";
+            }
+
+            return null;
+        }
     }
 }

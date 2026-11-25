@@ -45,7 +45,10 @@ A Roslyn incremental source generator bundled into the `LondoSpark.Func` package
 beside the analyzers. Its first job is instruction sets: `[Instructions<TOp>]` on a
 static partial class reads the cases of the union `TOp`, each marked
 `IInstruction<TResult>`, and writes typed constructors returning `Program<TOp, T>`,
-typed handler interfaces, and exhaustive `Run`/`RunAsync` interpreters. The monad
+typed handler interfaces, and exhaustive `Run`/`RunAsync` interpreters. Its second is
+async result types: `[AsyncResult<TFailure>]` on a partial struct with one type
+parameter completes it as a union over `Result<T, TFailure>`'s cases with an async
+method builder, because C# accepts only task-like types with one type parameter. The monad
 itself, `Program<TOp, T>`, is one hand-written generic type, so its operators and
 interpreters exist once rather than per instruction set. Generated code is
 compile-time code; it must not use runtime reflection or add runtime dispatch.
@@ -310,9 +313,12 @@ current unary `SelectMany` operation is the bind operation under test; when an e
 
 - Done first: the instruction-set generator for `Program<TOp, T>`, reading cases from
   C# 15 union constructors.
-- Next: per-domain async builders (`async Registration<T>` over
-  `Result<T, CustomerError>`, `async Script<T>` over `Program<TOp, T>`) on top of the
-  query-syntax core.
+- Done: per-domain async result types (`async Registration<T>` over
+  `Result<T, CustomerError>`) on top of the query-syntax core, with
+  `async Option<T>` and `ShortCircuitMethodBuilder<>` in the core library.
+- Not planned: `async Script<T>` over `Program<TOp, T>`. A compiler-generated state
+  machine can be resumed only once, so it cannot represent a program whose
+  continuations interpreters resume more than once; programs stay in query syntax.
 - Prototype the generator against `Option` and `Result`.
 - Define explicit metadata for focus and pass-through cases.
 - Generate the LINQ operator surface and compare its behavior with the hand-written

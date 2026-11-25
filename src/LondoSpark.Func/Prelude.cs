@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 
 namespace LondoSpark.Func;
@@ -61,5 +62,11 @@ public static class Prelude
     /// <summary>A failure waiting for the context to name its success type; it converts implicitly to a result or validation.</summary>
     /// <typeparam name="TFailure">The type of the failure value.</typeparam>
     /// <param name="Value">The failure value.</param>
-    public readonly record struct Failed<TFailure>(TFailure Value);
+    public readonly record struct Failed<TFailure>(TFailure Value)
+    {
+        /// <summary>Lets <c>await failure(error);</c> end a short-circuiting async method with that failure.</summary>
+        /// <returns>An awaiter that always short-circuits.</returns>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public FailedAwaiter<TFailure> GetAwaiter() => new(Value);
+    }
 }

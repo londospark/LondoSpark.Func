@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace LondoSpark.Func;
@@ -39,7 +40,7 @@ namespace LondoSpark.Func;
 /// </para>
 /// </remarks>
 [Union]
-public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, TFailure>>
+public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, TFailure>>, IShortCircuit<Result<TSuccess, TFailure>>
 {
     private const byte SuccessTag = 1;
     private const byte FailureTag = 2;
@@ -135,6 +136,25 @@ public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, 
     /// <returns><see langword="true"/> when the results differ in case or payload.</returns>
     public static bool operator !=(Result<TSuccess, TFailure> left, Result<TSuccess, TFailure> right) =>
         !left.Equals(right);
+
+    /// <summary>Lets <c>await</c> unwrap the success inside a short-circuiting async method, which returns the failure otherwise.</summary>
+    /// <returns>An awaiter that completes synchronously.</returns>
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public ResultAwaiter<TSuccess, TFailure> GetAwaiter() => new(this);
+
+    static bool IShortCircuit<Result<TSuccess, TFailure>>.TryShortCircuit(ShortCircuitException exception, out Result<TSuccess, TFailure> value)
+    {
+        if (exception is ShortCircuitException<TFailure> failed)
+        {
+            value = new Failure(failed.Failure);
+            return true;
+        }
+
+#pragma warning disable LSF0001 // The out value is unused when this is not a short-circuit of this result.
+        value = default;
+#pragma warning restore LSF0001
+        return false;
+    }
 
     /// <summary>Renders the active case so success and failure are visible in logs.</summary>
     /// <returns><c>Success(value)</c>, <c>Failure(error)</c>, or <c>Result(default)</c> when there is no case.</returns>
