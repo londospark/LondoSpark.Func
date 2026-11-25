@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
-    <Version>0.2.0-prealpha.2</Version>
+    <Version>0.3.0-prealpha.1</Version>
     <PackageId>LondoSpark.Func.AspNetCore</PackageId>
     <AssemblyName>LondoSpark.Func.AspNetCore</AssemblyName>
     <RootNamespace>LondoSpark.Func.AspNetCore</RootNamespace>

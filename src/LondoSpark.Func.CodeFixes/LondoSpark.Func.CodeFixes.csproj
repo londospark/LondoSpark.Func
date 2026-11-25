@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <IsRoslynComponent>true</IsRoslynComponent>
     <IsPackable>false</IsPackable>
-    <Version>0.2.0-prealpha.2</Version>
+    <Version>0.3.0-prealpha.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
