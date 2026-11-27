@@ -32,7 +32,7 @@ namespace LondoSpark.Func;
 /// </para>
 /// </remarks>
 [Union]
-public readonly struct Program<TOp, T>
+public readonly struct Program<TOp, T> : IUnion
 {
     private const byte DoneTag = 1;
     private const byte PendingTag = 2;
@@ -365,9 +365,11 @@ internal readonly struct Erased<TOp>
 // The first step of a lifted instruction: checks the interpreter answered with the promised type.
 internal sealed class LiftedStep<TOp, TResult> : Step<TOp>
 {
-    internal override Erased<TOp> Apply(object? value) =>
+    internal override Erased<TOp> Apply(object? value) => Erased<TOp>.Done(Checked(value));
+
+    internal static object? Checked(object? value) =>
         value is TResult || (value is null && default(TResult) is null)
-            ? Erased<TOp>.Done(value)
+            ? value
             : throw new InvalidCastException(
                 $"An interpreter of {typeof(TOp).Name} answered with {value?.GetType().Name ?? "null"}, but the instruction expects {typeof(TResult).Name}.");
 }

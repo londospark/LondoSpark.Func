@@ -54,6 +54,8 @@ public sealed class AllocationTests
     private static readonly Result<Func<int, int>, string> SuccessIncrement =
         Result.Return<Func<int, int>, string>(static value => value + 1);
     private static readonly Result<int, Unit> SuccessUnit = Result.Return<int, Unit>(1);
+    private static readonly Parsed<int> ParsedFour = success(4);
+    private static readonly Parsed<int> ParsedFailure = failure("failed");
 
     private static readonly ErrorResult<int, string> FocusedFailure = ErrorResult.Return<int, string>("failed");
     private static readonly ErrorResult<int, string> FocusedSuccess = SuccessInt.AsErrorResult();
@@ -376,9 +378,26 @@ public sealed class AllocationTests
         await AssertNoAllocation(static () => SumParsed(SuccessInt, SuccessInt));
         await AssertNoAllocation(static () => Completed(SumOptionLater(SomeInt)));
         await AssertNoAllocation(static () => Completed(SumResultLater(SuccessInt)));
+        await AssertNoAllocation(static () => Completed(UnwrapLater(SuccessInt)));
     }
 
 #endif
+
+    [Test]
+    public async Task GeneratedResultTypeQueriesDoNotAllocate()
+    {
+        await AssertNoAllocation(static () => ParsedFour.Select(static value => value + 1));
+        await AssertNoAllocation(static () => ParsedFour.Bind(static value => (Parsed<int>)success(value)));
+        await AssertNoAllocation(static () => from first in ParsedFour
+                                              from second in ParsedFour
+                                              select first + second);
+        await AssertNoAllocation(static () => from first in ParsedFour
+                                              from second in SuccessInt
+                                              select first + second);
+        await AssertNoAllocation(static () => from first in ParsedFailure
+                                              from second in ParsedFour
+                                              select first + second);
+    }
 
     [Test]
     public async Task AShortCircuitAllocatesOnlyItsException()
@@ -424,7 +443,27 @@ public sealed class AllocationTests
         await Assert.That(query).IsGreaterThan(0L).And.IsLessThanOrEqualTo(272L);
     }
 
-    // ----- Deliberate allocations, held to a bound -----
+    [Test]
+    public async Task TransformedProgramsAllocateOnlyTheProgramsStepsAndTheResultsTheyCarry()
+    {
+        // Lifting one instruction reuses a continuation per instruction set and type.
+        var lifted = Measure(static () => Session<int>.Lift(roll(Die)));
+        // Two lifted steps and a projection, run: the program's own steps plus one boxed result per step, against 272 bytes
+        // for the same query on a plain program. No closure checks the result; the library's steps do.
+        var query = Measure(static () => (from first in Session<int>.Lift(roll(Die))
+                                          from second in Session<int>.Lift(roll(Die))
+                                          select first + second).Value.Run(Handler));
+        // A failure before any instruction skips the rest of the query without building it.
+        var stopped = Measure(static () => (from first in Session<int>.Failure("no")
+                                            from second in Session<int>.Lift(roll(Die))
+                                            select first + second).Value.Run(Handler));
+
+        await Assert.That(lifted).IsEqualTo(0L);
+        await Assert.That(query).IsGreaterThan(0L).And.IsLessThanOrEqualTo(344L);
+        await Assert.That(stopped).IsEqualTo(0L);
+    }
+
+        // ----- Deliberate allocations, held to a bound -----
 
     [Test]
     public async Task BoxingTheValueProtocolAllocatesOneSmallBox()
@@ -531,6 +570,10 @@ public sealed class AllocationTests
 
     private static async Parsed<int> SumParsed(Result<int, string> first, Result<int, string> second) =>
         await first + await second;
+
+    [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
+    private static async ValueTask<Result<int, string>> UnwrapLater(Result<int, string> value) =>
+        success(await new ValueTask<Result<int, string>>(value).Unwrap() + await CompletedResult.Unwrap());
 
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
     private static async ValueTask<Option<int>> SumOptionLater(Option<int> value) =>

@@ -345,11 +345,11 @@ public struct ResultMethodBuilder<TSuccess, TFailure>
 /// async ValueTask&lt;Result&lt;Receipt, CheckoutError&gt;&gt; CheckoutAsync(Order order)
 /// {
 ///     var valid = await Validate(order);
-///     var total = await await inventory.ReserveAsync(valid.Sku, valid.Quantity);
-///     return new Receipt(await await payments.ChargeAsync(valid.Customer, total), total);
+///     var total = await inventory.ReserveAsync(valid.Sku, valid.Quantity).Unwrap();
+///     return success(new Receipt(await payments.ChargeAsync(valid.Customer, total).Unwrap(), total));
 /// }
 /// </code>
-/// <c>await await</c> waits for the task and then unwraps its result.
+/// <see cref="UnwrapExtensions"/> waits for a task and then unwraps the option or result it produced.
 /// </para>
 /// <para>
 /// It wraps <see cref="AsyncValueTaskMethodBuilder{TResult}"/>, so a method that completes synchronously allocates

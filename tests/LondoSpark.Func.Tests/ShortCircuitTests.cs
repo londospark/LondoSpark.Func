@@ -159,6 +159,49 @@ public sealed class ShortCircuitTests
         static async Parsed<int> Double(string text) => await Add(text, text);
     }
 
+    [Test]
+    public async Task GeneratedResultTypesComposeInQuerySyntax()
+    {
+        var both = from first in Add("1", "2")
+                   from second in Add("3", "4")
+                   select first * second;
+        var withAResult = from first in Add("1", "2")
+                          from second in Parse("x")
+                          select first + second;
+        var mapped = Add("2", "3").Select(static sum => sum * 10);
+        var bound = Add("2", "3").Bind(static sum => Add(sum.ToString(CultureInfo.InvariantCulture), "1"));
+
+        await Assert.That(both.AsResult()).IsEqualTo(Result.Return<int, string>(21));
+        await Assert.That(withAResult.AsResult()).IsEqualTo(Result.Failure<int, string>("'x' is not a number"));
+        await Assert.That(mapped.AsResult()).IsEqualTo(Result.Return<int, string>(50));
+        await Assert.That(bound.AsResult()).IsEqualTo(Result.Return<int, string>(6));
+    }
+
+    [Test]
+    public async Task GeneratedResultTypesStartAsynchronousQueries()
+    {
+        var charged = await (from amount in Add("20", "20")
+                             from balance in DebitAsync(amount)
+                             select balance);
+        var stopped = await (from amount in Add("x", "1")
+                             from balance in DebitAsync(amount)
+                             select balance);
+
+        await Assert.That(charged).IsEqualTo(Result.Return<int, string>(60));
+        await Assert.That(stopped).IsEqualTo(Result.Failure<int, string>("'x' is not a number"));
+    }
+
+    [Test]
+    public async Task HandWrittenUnionsAreIUnions()
+    {
+        // Code that sees only an object, such as a logger, can ask any union for its active case.
+        object[] values = [some(3), Result.Failure<int, string>("no"), Add("1", "1")];
+
+        var cases = Array.ConvertAll(values, static value => value is System.Runtime.CompilerServices.IUnion union ? union.Value : null);
+
+        await Assert.That(cases).IsEquivalentTo(new object?[] { new Option<int>.Some(3), new Failure("no"), new Success(2) });
+    }
+
     // ----- ShortCircuitMethodBuilder -----
 
     [Test]
@@ -180,6 +223,27 @@ public sealed class ShortCircuitTests
     {
         await Assert.That((await ParseLaterAsync("8")).AsResult()).IsEqualTo(Result.Return<int, string>(8));
         await Assert.That((await ParseLaterAsync("q")).AsResult()).IsEqualTo(Result.Failure<int, string>("'q' is not a number"));
+    }
+
+    [Test]
+    public async Task UnwrapWaitsForATaskAndThenUnwrapsIt()
+    {
+        await Assert.That(await TotalAsync(10, 20)).IsEqualTo(Result.Return<int, string>(70));
+        await Assert.That(await TotalAsync(10, 200)).IsEqualTo(Result.Failure<int, string>("200 exceeds the balance"));
+        await Assert.That(await FirstUserAsync(4)).IsEqualTo(some(4));
+        await Assert.That(await FirstUserAsync(-1)).IsEqualTo(Option.Empty<int>());
+
+        [AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
+        static async ValueTask<Result<int, string>> TotalAsync(int first, int second)
+        {
+            var afterFirst = await DebitAsync(first).Unwrap();
+            var afterSecond = await new ValueTask<Result<int, string>>(DebitAsync(second)).Unwrap();
+            return success(afterFirst + afterSecond - 100);
+        }
+
+        [AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
+        static async ValueTask<Option<int>> FirstUserAsync(int id) =>
+            some(await FindAsync(id).Unwrap());
     }
 
     [Test]

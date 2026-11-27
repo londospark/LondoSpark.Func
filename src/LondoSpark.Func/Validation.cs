@@ -22,7 +22,7 @@ namespace LondoSpark.Func;
 /// structural equality.
 /// </remarks>
 [Union]
-public readonly struct Validation<TSuccess, TValidationError> : IEquatable<Validation<TSuccess, TValidationError>>
+public readonly struct Validation<TSuccess, TValidationError> : IEquatable<Validation<TSuccess, TValidationError>>, IUnion
 {
     private const byte SuccessTag = 1;
     private const byte FailureTag = 2;

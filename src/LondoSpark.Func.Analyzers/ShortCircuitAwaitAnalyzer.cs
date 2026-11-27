@@ -79,18 +79,17 @@ public sealed class ShortCircuitAwaitAnalyzer : DiagnosticAnalyzer
         var kind = types.Classify(awaited.Operation.Type);
         var handler = types.Handler(function);
 
-        if (kind.IsShortCircuit)
+        if (kind.IsShortCircuit && !handler.Accepts(kind))
         {
-            if (!handler.Accepts(kind))
-            {
-                context.ReportDiagnostic(Diagnostic.Create(
-                    CannotShortCircuit,
-                    awaited.Syntax.GetLocation(),
-                    awaited.Operation.Type!.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
-                    kind.Describe()));
-            }
+            context.ReportDiagnostic(Diagnostic.Create(
+                CannotShortCircuit,
+                awaited.Syntax.GetLocation(),
+                awaited.Operation.Type!.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
+                kind.Describe()));
         }
-        else if (handler.IsSynchronous && awaited.Operation.Type is { } other)
+
+        // Unwrap() short-circuits like an option or result but waits for a task first, so it can suspend.
+        if (handler.IsSynchronous && (!kind.IsShortCircuit || kind.CanSuspend) && awaited.Operation.Type is { } other)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 CannotSuspend,
@@ -162,9 +161,11 @@ public sealed class ShortCircuitAwaitAnalyzer : DiagnosticAnalyzer
         return containing as IMethodSymbol;
     }
 
-    private readonly struct Kind(bool isShortCircuit, ITypeSymbol? failure)
+    private readonly struct Kind(bool isShortCircuit, ITypeSymbol? failure, bool canSuspend = false)
     {
         public bool IsShortCircuit { get; } = isShortCircuit;
+
+        public bool CanSuspend { get; } = canSuspend;
 
         // Null for absence; the failure type for a result.
         public ITypeSymbol? Failure { get; } = failure;
@@ -174,6 +175,8 @@ public sealed class ShortCircuitAwaitAnalyzer : DiagnosticAnalyzer
         public static Kind Absent => new(true, null);
 
         public static Kind Failed(ITypeSymbol failure) => new(true, failure);
+
+        public Kind Suspending() => new(IsShortCircuit, Failure, canSuspend: true);
 
         public string Describe() =>
             Failure is null
@@ -202,7 +205,9 @@ public sealed class ShortCircuitAwaitAnalyzer : DiagnosticAnalyzer
         INamedTypeSymbol? asyncResult,
         INamedTypeSymbol? builder,
         INamedTypeSymbol? exception,
-        INamedTypeSymbol? valueTask)
+        INamedTypeSymbol? valueTask,
+        INamedTypeSymbol? optionTask,
+        INamedTypeSymbol? resultTask)
     {
         public static KnownTypes? From(Compilation compilation)
         {
@@ -220,7 +225,9 @@ public sealed class ShortCircuitAwaitAnalyzer : DiagnosticAnalyzer
                 compilation.GetTypeByMetadataName("LondoSpark.Func.AsyncResultAttribute`1"),
                 compilation.GetTypeByMetadataName("LondoSpark.Func.ShortCircuitMethodBuilder`1"),
                 compilation.GetTypeByMetadataName("LondoSpark.Func.ShortCircuitException"),
-                compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1"));
+                compilation.GetTypeByMetadataName("System.Threading.Tasks.ValueTask`1"),
+                compilation.GetTypeByMetadataName("LondoSpark.Func.OptionTaskAwaitable`1"),
+                compilation.GetTypeByMetadataName("LondoSpark.Func.ResultTaskAwaitable`2"));
         }
 
         public Kind Classify(ITypeSymbol? type)
@@ -234,6 +241,12 @@ public sealed class ShortCircuitAwaitAnalyzer : DiagnosticAnalyzer
 
             if (Same(definition, result) || Same(definition, failed))
                 return Kind.Failed(named.TypeArguments[named.TypeArguments.Length - 1]);
+
+            if (Same(definition, optionTask))
+                return Kind.Absent.Suspending();
+
+            if (Same(definition, resultTask))
+                return Kind.Failed(named.TypeArguments[1]).Suspending();
 
             return AsyncResultFailure(named) is { } failure ? Kind.Failed(failure) : Kind.Other;
         }

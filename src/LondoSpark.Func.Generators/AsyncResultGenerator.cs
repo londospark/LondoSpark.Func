@@ -94,7 +94,7 @@ public sealed class AsyncResultGenerator : IIncrementalGenerator
             /// </remarks>
             [global::System.Runtime.CompilerServices.Union]
             [global::System.Runtime.CompilerServices.AsyncMethodBuilder(typeof({{name}}MethodBuilder<>))]
-            partial struct {{self}} : global::System.IEquatable<{{self}}>, global::LondoSpark.Func.IShortCircuit<{{self}}>
+            partial struct {{self}} : global::System.IEquatable<{{self}}>, global::LondoSpark.Func.IShortCircuit<{{self}}>, global::System.Runtime.CompilerServices.IUnion
             {
                 private readonly {{result}} _result;
 
@@ -127,6 +127,77 @@ public sealed class AsyncResultGenerator : IIncrementalGenerator
                 /// <summary>Gets the wrapped result, for query syntax and the result's operations.</summary>
                 /// <returns>The result.</returns>
                 public {{result}} AsResult() => _result;
+
+                /// <summary>Transforms a success, carrying a failure unchanged.</summary>
+                /// <param name="selector">The transformation applied only to a success.</param>
+                /// <returns>The transformed success, or the failure.</returns>
+                public {{name}}<TOut> Select<TOut>(global::System.Func<{{t}}, TOut> selector)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(selector);
+                    return _result.TryGetValue(out {{result}}.Success first)
+                        ? global::LondoSpark.Func.Result.Return<TOut, {{type.Failure}}>(selector(first.Value))
+                        : Propagate<{{t}}, TOut>(_result);
+                }
+
+                /// <summary>Continues with another step of the same type, stopping at the first failure.</summary>
+                /// <param name="binder">The next step, invoked only for a success.</param>
+                /// <returns>The next step's value, or the failure.</returns>
+                public {{name}}<TOut> Bind<TOut>(global::System.Func<{{t}}, {{name}}<TOut>> binder)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(binder);
+                    return _result.TryGetValue(out {{result}}.Success first) ? binder(first.Value) : Propagate<{{t}}, TOut>(_result);
+                }
+
+                /// <summary>Composes two steps of this type in query syntax.</summary>
+                /// <param name="next">Produces the second step from the first success.</param>
+                /// <param name="project">Combines both successes.</param>
+                /// <returns>The projected success, or the first failure.</returns>
+                public {{name}}<TOut> SelectMany<TNext, TOut>(global::System.Func<{{t}}, {{name}}<TNext>> next, global::System.Func<{{t}}, TNext, TOut> project)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(next);
+                    return _result.TryGetValue(out {{result}}.Success first)
+                        ? Project(first.Value, next(first.Value)._result, project)
+                        : Propagate<{{t}}, TOut>(_result);
+                }
+
+                /// <summary>Composes this type with a plain result in query syntax.</summary>
+                /// <param name="next">Produces the second result from the first success.</param>
+                /// <param name="project">Combines both successes.</param>
+                /// <returns>The projected success, or the first failure.</returns>
+                public {{name}}<TOut> SelectMany<TNext, TOut>(global::System.Func<{{t}}, global::LondoSpark.Func.Result<TNext, {{type.Failure}}>> next, global::System.Func<{{t}}, TNext, TOut> project)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(next);
+                    return _result.TryGetValue(out {{result}}.Success first)
+                        ? Project(first.Value, next(first.Value), project)
+                        : Propagate<{{t}}, TOut>(_result);
+                }
+
+                /// <summary>Continues with a task-returning step, so an asynchronous query can start from this type.</summary>
+                /// <param name="next">Produces the second result from the first success.</param>
+                /// <param name="project">Combines both successes.</param>
+                /// <returns>The projected success, or the first failure.</returns>
+                public global::System.Threading.Tasks.ValueTask<global::LondoSpark.Func.Result<TOut, {{type.Failure}}>> SelectMany<TNext, TOut>(global::System.Func<{{t}}, global::System.Threading.Tasks.Task<global::LondoSpark.Func.Result<TNext, {{type.Failure}}>>> next, global::System.Func<{{t}}, TNext, TOut> project) =>
+                    global::LondoSpark.Func.ResultAsyncQueries.SelectMany(_result, next, project);
+
+                /// <summary>Continues with a <see cref="global::System.Threading.Tasks.ValueTask{TResult}"/>-returning step, so an asynchronous query can start from this type.</summary>
+                /// <param name="next">Produces the second result from the first success.</param>
+                /// <param name="project">Combines both successes.</param>
+                /// <returns>The projected success, or the first failure.</returns>
+                public global::System.Threading.Tasks.ValueTask<global::LondoSpark.Func.Result<TOut, {{type.Failure}}>> SelectMany<TNext, TOut>(global::System.Func<{{t}}, global::System.Threading.Tasks.ValueTask<global::LondoSpark.Func.Result<TNext, {{type.Failure}}>>> next, global::System.Func<{{t}}, TNext, TOut> project) =>
+                    global::LondoSpark.Func.ResultAsyncQueries.SelectMany(_result, next, project);
+
+                private static {{name}}<TOut> Project<TNext, TOut>({{t}} first, global::LondoSpark.Func.Result<TNext, {{type.Failure}}> second, global::System.Func<{{t}}, TNext, TOut> project)
+                {
+                    global::System.ArgumentNullException.ThrowIfNull(project);
+                    return second.TryGetValue(out global::LondoSpark.Func.Result<TNext, {{type.Failure}}>.Success next)
+                        ? global::LondoSpark.Func.Result.Return<TOut, {{type.Failure}}>(project(first, next.Value))
+                        : Propagate<TNext, TOut>(second);
+                }
+
+                private static global::LondoSpark.Func.Result<TOut, {{type.Failure}}> Propagate<TIn, TOut>(global::LondoSpark.Func.Result<TIn, {{type.Failure}}> result) =>
+                    result.TryGetValue(out global::LondoSpark.Func.Result<TIn, {{type.Failure}}>.Failure failure)
+                        ? global::LondoSpark.Func.Result.Failure<TOut, {{type.Failure}}>(failure.Value)
+                        : throw new global::System.InvalidOperationException("A default {{name}} contains no case. Construct it from a result, success(...), or failure(...).");
 
                 /// <summary>Lets <c>await</c> unwrap the success inside a short-circuiting async method.</summary>
                 /// <returns>An awaiter that completes synchronously.</returns>

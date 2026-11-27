@@ -48,7 +48,13 @@ static partial class reads the cases of the union `TOp`, each marked
 typed handler interfaces, and exhaustive `Run`/`RunAsync` interpreters. Its second is
 async result types: `[AsyncResult<TFailure>]` on a partial struct with one type
 parameter completes it as a union over `Result<T, TFailure>`'s cases with an async
-method builder, because C# accepts only task-like types with one type parameter. The monad
+method builder, because C# accepts only task-like types with one type parameter. Its
+third is monad transformers: `[MonadTransformer]` on a partial record struct wrapping
+`Outer<Option<T>>` or `Outer<Result<T, E>>` writes a monad that binds both layers,
+using only the outer monad's query operators and a `Pure`, because C# cannot abstract
+over type constructors to write one generic transformer. Over `Program<TOp, T>` it calls
+hand-written steps in the core library instead, which check the inner value inside the
+program's own continuation rather than in a closure per bind. The monad
 itself, `Program<TOp, T>`, is one hand-written generic type, so its operators and
 interpreters exist once rather than per instruction set. Generated code is
 compile-time code; it must not use runtime reflection or add runtime dispatch.
@@ -316,6 +322,8 @@ current unary `SelectMany` operation is the bind operation under test; when an e
 - Done: per-domain async result types (`async Registration<T>` over
   `Result<T, CustomerError>`) on top of the query-syntax core, with
   `async Option<T>` and `ShortCircuitMethodBuilder<>` in the core library.
+- Done: monad transformers, with `Program<TOp, Result<T, E>>` as the motivating case;
+  a failure skips every later instruction.
 - Not planned: `async Script<T>` over `Program<TOp, T>`. A compiler-generated state
   machine can be resumed only once, so it cannot represent a program whose
   continuations interpreters resume more than once; programs stay in query syntax.

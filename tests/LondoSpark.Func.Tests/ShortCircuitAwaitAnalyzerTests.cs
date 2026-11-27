@@ -48,6 +48,8 @@ public sealed class ShortCircuitAwaitAnalyzerTests
     [Arguments("[AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))] static async ValueTask<Result<int, string>> M() { await Task.Yield(); return success(await Parse(\"x\")); }")]
     [Arguments("[AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))] static async ValueTask<Parsed<int>> M() { await Task.Yield(); return success(await Parse(\"x\")); }")]
     [Arguments("static async Task<Option<int>> M() { await Task.Yield(); return Find(1); }")]
+    [Arguments("[AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))] static async ValueTask<Option<int>> M() => some(await Task.FromResult(Find(1)).Unwrap());")]
+    [Arguments("[AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))] static async ValueTask<Parsed<int>> M() => success(await Task.FromResult(Parse(\"x\")).Unwrap());")]
     public async Task AwaitsThatTheMethodCanShortCircuitAreAccepted(string method)
     {
         var diagnostics = await AnalyzeAsync(method);
@@ -64,6 +66,8 @@ public sealed class ShortCircuitAwaitAnalyzerTests
     [Arguments("static async Coded<int> M() => await Parse(\"x\");")]
     [Arguments("static async ValueTask<Option<int>> M() { var found = await Find(1); return some(found); }")]
     [Arguments("static void M() { Func<Task<int>> f = async () => await Find(1); }")]
+    [Arguments("static async Task<int> M() => await Task.FromResult(Find(1)).Unwrap();")]
+    [Arguments("[AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))] static async ValueTask<Coded<int>> M() => success(await Task.FromResult(Parse(\"x\")).Unwrap());")]
     public async Task AwaitsThatCannotShortCircuitTheMethodAreErrors(string method)
     {
         var diagnostics = await AnalyzeAsync(method);
@@ -99,6 +103,7 @@ public sealed class ShortCircuitAwaitAnalyzerTests
     [Arguments("static async Option<int> M() { await Task.Yield(); return 1; }")]
     [Arguments("static async Parsed<int> M() => await Task.FromResult(1);")]
     [Arguments("static async Option<int> M() => await await Task.FromResult(Find(1));")]
+    [Arguments("static async Option<int> M() => await Task.FromResult(Find(1)).Unwrap();")]
     public async Task SynchronousMethodsThatAwaitTasksAreErrors(string method)
     {
         var diagnostics = await AnalyzeAsync(method);

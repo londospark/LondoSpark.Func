@@ -12,7 +12,7 @@ using static LondoSpark.Func.Result<string, string>;
 var release = Steps.Release("1.4.0");
 
 Console.WriteLine("Dry run: print every step, assume success.");
-Report(release.Run(new DryRun()));
+Report(release.Value.Run(new DryRun()));
 
 Console.WriteLine();
 Console.WriteLine("Simulation: a machine whose tests fail.");
@@ -21,11 +21,11 @@ var failingTests = new Dictionary<string, CommandResult>
     ["git status --porcelain"] = new(0, string.Empty),
     ["dotnet test --configuration Release"] = new(1, "2 tests failed"),
 };
-Report(await release.RunAsync(new Simulated(failingTests, approves: true)));
+Report(await release.Value.RunAsync(new Simulated(failingTests, approves: true)));
 
 Console.WriteLine();
 Console.WriteLine("What if: step to the approval, then resume the same program both ways.");
-var program = release;
+var program = release.Value;
 while (program is Pending(var instruction and not Approve, var next))
 {
     // Answer everything before the approval by hand: a program is a union you can step through.

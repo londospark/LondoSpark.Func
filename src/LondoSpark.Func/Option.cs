@@ -30,7 +30,7 @@ namespace LondoSpark.Func;
 /// </remarks>
 [Union]
 [AsyncMethodBuilder(typeof(OptionMethodBuilder<>))]
-public readonly struct Option<TSome> : IEquatable<Option<TSome>>, IShortCircuit<Option<TSome>>
+public readonly struct Option<TSome> : IEquatable<Option<TSome>>, IShortCircuit<Option<TSome>>, IUnion
 {
     private readonly TSome _value;
     private readonly bool _isSome;

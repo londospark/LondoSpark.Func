@@ -268,7 +268,7 @@ attaching the debugger, which can distort timing.
 [`examples/`](examples) contains small projects that use the library the way an
 application would: a domain library, a console pipeline, an ASP.NET Core minimal
 API, `System.Text.Json` converters, an F# consumer, an asynchronous checkout written
-as one query and again with `await`, and a scripted game and a release runbook built on `Program<TOp, T>`. They build with the
+as one query and again with `await`, and a scripted game built on `Program<TOp, T>`, and a release runbook built on a program composed with a result. They build with the
 solution, and their README records the helpers the examples had to write
 themselves.
 
@@ -276,7 +276,7 @@ themselves.
 
 The core package ships Roslyn analyzers and code fixes for C# consumers, so no
 extra reference is needed. `Result<TSuccess, TFailure>`, `Validation<TSuccess, TError>`,
-`ErrorResult<TSuccess, TFailure>`, `Program<TOp, T>`, and `[AsyncResult]` types are structs, so `default`, `new()`, and arrays
+`ErrorResult<TSuccess, TFailure>`, `Program<TOp, T>`, `[AsyncResult]` types, and `[MonadTransformer]` types over them are structs, so `default`, `new()`, and arrays
 created without an initializer can produce a value with no case; `Option<TSome>`
 needs no rule because its zero value is `None`.
 
@@ -291,6 +291,8 @@ needs no rule because its zero value is `None`.
 | `LSF0101` | Error | `[Instructions<TOp>]` whose `TOp` is not a union |
 | `LSF0102` | Error | an instruction case that does not implement `IInstruction<TResult>` exactly once |
 | `LSF0103` | Error | `[AsyncResult<TFailure>]` on a type that is not a top-level partial struct with one type parameter |
+| `LSF0104` | Error | `[MonadTransformer]` on a type that is not a top-level partial record struct wrapping `Outer<Option<T>>` or `Outer<Result<T, E>>` |
+| `LSF0105` | Error | `[MonadTransformer]` over an outer monad the generator cannot wrap a value in, without a `Pure` declared |
 
 A suppressor clears CA2012 on query expressions that produce a `ValueTask` of an
 `Option` or `Result`: `await (from ... select ...)` consumes the task once, but the
@@ -501,18 +503,21 @@ async Registration<Customer> Register(NewCustomer candidate)
 
 `Registration<T>` is a union over `Result<T, CustomerError>`'s `Success` and
 `Failure` cases, converts to and from that result implicitly, and can itself be
-awaited. `AsResult()` hands it to query syntax.
+awaited. It has `Select`, `Bind`, and `SelectMany`, so it composes in query syntax
+with itself, with plain results, and with `Task` and `ValueTask` steps, without
+allocating beyond its lambdas.
 
 To await tasks as well, return a `ValueTask` and name the builder on the method.
-`await await` waits for a task and then unwraps the option or result it produced:
+`Unwrap()` waits for a task and then unwraps the option or result it produced, in one
+`await` and without allocating:
 
 ```csharp
 [AsyncMethodBuilder(typeof(ShortCircuitMethodBuilder<>))]
 async ValueTask<Result<Receipt, CheckoutError>> CheckoutAsync(Order order)
 {
     var valid = await Validate(order);
-    var total = await await inventory.ReserveAsync(valid.Sku, valid.Quantity);
-    var payment = await await payments.ChargeAsync(valid.Customer, total);
+    var total = await inventory.ReserveAsync(valid.Sku, valid.Quantity).Unwrap();
+    var payment = await payments.ChargeAsync(valid.Customer, total).Unwrap();
     return success(new Receipt(payment, total));
 }
 ```
@@ -525,7 +530,13 @@ throw, so on a hot path where failure is common, prefer query syntax. Three
 analyzers keep the exception inside the method: `LSF0003` reports an await whose
 method cannot return its absent or failed case, `LSF0004` a `catch` that would
 swallow it (filter with `when (e is not ShortCircuitException)`), and `LSF0005` a
-synchronous method that awaits a task.
+synchronous method that awaits a task, including through `Unwrap()`.
+
+`Option`, `Result`, `Validation`, `Program`, and generated result types implement
+`System.Runtime.CompilerServices.IUnion`, as `union` declarations do, so code that
+holds only an `object`, such as a logger, can read the active case with
+`value is IUnion u ? u.Value : value`. It does not make case patterns match a boxed
+union; no union supports that.
 
 ### Programs and instruction sets
 
@@ -578,6 +589,63 @@ however many instructions they run. Finished programs and lifted instructions do
 allocate; each pending step allocates its continuation, and a value-typed answer is
 boxed once on its way through. Interpreters that answer with `object`
 (`program.Run(op => ...)`) also work without the generator.
+
+### Monad transformers
+
+A program whose steps can fail is two monads, one inside the other:
+`Program<RunbookOp, Result<string, string>>`. Query syntax over it binds only the
+program, so every step has to look inside the result and decide by hand whether to
+carry on, and each check nests the rest of the script one level deeper. Monads do not
+compose in general, but a result or option inside any other monad does: the pair is a
+monad transformer, `ExceptT` and `MaybeT` in Haskell, `EitherT` and `OptionT` in Scala's
+Cats. Declare one and the bundled generator writes it, binding both layers:
+
+```csharp
+[MonadTransformer]
+public readonly partial record struct Script<T>(Program<RunbookOp, Result<T, string>> Value);
+
+Script<string> Release(string tag) =>
+    from tests in run("dotnet test")                            // a program step, which cannot fail
+    from passed in Require(tests.Succeeded, "tests failed")     // a Script<Unit>, which may
+    from approved in approve($"Tag and push {tag}?")
+    from yes in Require(approved, "the operator said no")
+    from pushed in run($"git push origin {tag}")                // never runs after a failure
+    select tag;
+
+Script<Unit> Require(bool condition, string reason) =>
+    condition ? Script<Unit>.Return(Unit.Value) : Script<Unit>.Failure(reason);
+
+var outcome = Release("v1.4.0").Value.Run(new DryRun());       // Result<string, string>
+```
+
+Each `from` may be a step of the transformer type, of the outer monad (a program step,
+lifted as if it cannot fail), or of the inner one (a plain `Result`). The first
+failure skips every later instruction. The value is still a program: run it with any
+interpreter, or step it and resume a continuation more than once.
+
+C# cannot abstract over type constructors, so there is no single generic transformer
+type; the generator writes one per declaration. The wrapped type is
+`Outer<Inner<T>>`:
+
+- **Inner** is `Option<T>` or `Result<T, E>`. Their short-circuit composes under any
+  outer monad, so an absent or failed value stops the computation at that point.
+- **Outer** is any type with query operators (`Select`, and `SelectMany` with a
+  projection) in scope where the struct is declared. The generator knows how to wrap a
+  plain value in `Program`, `Option`, and `Result`; for any other outer monad, declare
+  `private static Outer<TPure> Pure<TPure>(TPure value)` on the struct.
+
+The generated type has `Return`, `Lift`, `Failure` (or `None()` for an option),
+`Select`, `Bind`, and `SelectMany` over all three kinds of step, and converts to and
+from the wrapped type, from a plain inner value, and from the prelude's `success`,
+`failure`, and `none`.
+
+Over `Program`, the library builds the early stop into the program's own steps: each
+step holds your delegates and checks the result itself, and lifting an instruction
+allocates nothing. Running a two-step query allocates 344 bytes, against 272 for the
+same query on a program that cannot fail; the difference is the result boxed between
+steps. A failure before the first instruction allocates nothing. Over any other outer
+monad, each step allocates the closure it hands that monad's query operators. See
+[`examples/Runbook`](examples/Runbook).
 
 ### ASP.NET Core minimal APIs
 

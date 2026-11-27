@@ -40,7 +40,7 @@ namespace LondoSpark.Func;
 /// </para>
 /// </remarks>
 [Union]
-public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, TFailure>>, IShortCircuit<Result<TSuccess, TFailure>>
+public readonly struct Result<TSuccess, TFailure> : IEquatable<Result<TSuccess, TFailure>>, IShortCircuit<Result<TSuccess, TFailure>>, IUnion
 {
     private const byte SuccessTag = 1;
     private const byte FailureTag = 2;

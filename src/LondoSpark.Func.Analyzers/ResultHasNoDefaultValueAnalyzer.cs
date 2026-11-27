@@ -53,7 +53,10 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
             if (builder.Count == 0)
                 return;
 
-            var guarded = new Guarded(builder.ToImmutable(), compilation.GetTypeByMetadataName("LondoSpark.Func.AsyncResultAttribute`1"));
+            var guarded = new Guarded(
+                builder.ToImmutable(),
+                compilation.GetTypeByMetadataName("LondoSpark.Func.AsyncResultAttribute`1"),
+                compilation.GetTypeByMetadataName("LondoSpark.Func.MonadTransformerAttribute"));
 
             compilationContext.RegisterOperationAction(
                 operationContext => Report(operationContext, operationContext.Operation.Type, guarded),
@@ -125,8 +128,8 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
                 constructionHint));
     }
 
-    // The library's own unions, plus every struct the generator completes from [AsyncResult<TFailure>], which wraps a result.
-    private sealed class Guarded(ImmutableDictionary<INamedTypeSymbol, string> known, INamedTypeSymbol? asyncResult)
+    // The library's own unions, plus structs the generator completes from [AsyncResult<TFailure>] or [MonadTransformer], which wrap a result or program.
+    private sealed class Guarded(ImmutableDictionary<INamedTypeSymbol, string> known, INamedTypeSymbol? asyncResult, INamedTypeSymbol? monadTransformer)
     {
         public string? Hint(INamedTypeSymbol type)
         {
@@ -137,6 +140,9 @@ public sealed class ResultHasNoDefaultValueAnalyzer : DiagnosticAnalyzer
             {
                 if (asyncResult is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass?.OriginalDefinition, asyncResult))
                     return "a prelude 'success' or 'failure', or a conversion from a result";
+
+                if (monadTransformer is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, monadTransformer))
+                    return "its generated 'Return', 'Lift', or 'Failure', or a conversion from the value it wraps";
             }
 
             return null;

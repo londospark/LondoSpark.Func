@@ -8,6 +8,35 @@ Because it is pre-1.0, a minor version may contain breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- `Unwrap()` on a `Task` or `ValueTask` of an option or result: inside a
+  `ShortCircuitMethodBuilder` method, `await task.Unwrap()` waits and then unwraps, or
+  short-circuits, in one step instead of `await await`. It allocates nothing beyond the
+  task.
+- Generated `[AsyncResult]` types have `Select`, `Bind`, and `SelectMany`, so they
+  compose in query syntax with themselves, plain results, and `Task` and `ValueTask`
+  steps without `AsResult()`.
+- `[MonadTransformer]` on a partial record struct wrapping `Outer<Option<T>>` or
+  `Outer<Result<T, E>>` generates a monad that binds both layers, such as `Script<T>`
+  over `Program<RunbookOp, Result<T, string>>`: the first failure skips every later
+  instruction. This is a monad transformer, `ExceptT`/`MaybeT` in Haskell and
+  `EitherT`/`OptionT` in Scala. Query steps may be the transformer type, the outer
+  monad, or the inner one. The outer monad is any type with query operators; `Program`,
+  `Option`, and `Result` work as they are, and others declare `Pure`. Over `Program`,
+  the early stop is built into the program's own steps, so lifting an instruction
+  allocates nothing and a two-step query run allocates 344 bytes against 272 for a
+  program that cannot fail. `LSF0104` and `LSF0105` report a declaration the generator
+  cannot use, and `LSF0001` covers transformer types.
+- `Option`, `Result`, `Validation`, `Program`, and generated result types implement
+  `IUnion`, as `union` declarations do, so code holding an `object` can read the
+  active case.
+
+### Changed
+
+- The `Runbook` example is one flat query over a `[MonadTransformer] Script<T>` instead of one
+  nested method per check.
+
 ## [0.4.0-prealpha.1] - 2026-11-25
 
 ### Added
